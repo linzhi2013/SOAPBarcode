@@ -170,12 +170,12 @@ my $full_out_pct=(100-$Ucf*100);
 while(<FLI>){
 	chomp;
 	my $dupout="$_".".dup";
-	`$binpath/bin/usearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
+	`$binpath/bin/vsearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
 	if ($Pro eq "y") {
 		my $proout="$_".".pro";
 		`perl $binpath/bin/Pro_C.pl -lib f -int $Interval -fas $dupout -out $proout`;
 		my $otuout="$_".".otu";
-		`$binpath/bin/usearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout`;
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -201,7 +201,7 @@ while(<FLI>){
 		`rm $dupout $proout $otuout`;
 	}elsif ($Pro eq "n") {
 		my $otuout="$_".".otu";
-		`$binpath/bin/usearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -375,9 +375,9 @@ for my $key (keys %component){
 		my $abun_out="$component{$key}[2]"."A";
 		`perl $binpath/bin/sam_abundance.pl -fas $component{$key}[2] -sam bwa.sam -out $abun_out`;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
 		`rm $abun_out $sort_out`;
 	}elsif($com_num >1 && $Len>0){
 		my %chash;
@@ -407,9 +407,9 @@ for my $key (keys %component){
 		}
 		close COU;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
 #		 `rm $abun_out $sort_out`;
 	}else{
 		print "there are problems of index length ($Len) and number of assembled reuslts ($com_num)\n";
