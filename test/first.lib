@@ -1,0 +1,10 @@
+[LIB]
+insertsize=200
+readlength=150
+fq1=/ifs4/NGB_ENV/USER/mengguanliang/softwares/soapbarcode/test/all_simu-SLS/3G_SLS.1.fq.gz
+fq2=/ifs4/NGB_ENV/USER/mengguanliang/softwares/soapbarcode/test/all_simu-SLS/3G_SLS.2.fq.gz
+[LIB]
+insertsize=658
+readlength=150
+fq1=/ifs4/NGB_ENV/USER/mengguanliang/softwares/soapbarcode/test/all_simu-FLS/2G_FLS.1.fq.gz
+fq2=/ifs4/NGB_ENV/USER/mengguanliang/softwares/soapbarcode/test/all_simu-FLS/2G_FLS.2.fq.gz
