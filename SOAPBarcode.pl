@@ -6,6 +6,9 @@ This program is attempt to assemble standard COI barcode region with two librari
 
 =head1 Version
 
+version 4.0 
+modified by Guanliang Meng: 1) change usearch to vsearch.
+
 version 3.0 
 modified: 1) protein express check can be skipped without setting -int and -pro n;
 	  2) multiple primers with index ahead can be proccessed batching, however, if index
@@ -47,7 +50,7 @@ perl SOAPBarcode.pl <parameter>
 	-clb	the lower support branch cutoff (0.1)
 	-lms	the maximun extension length (660)
 	-lss	the minimun extension length (450)
-	-cpt	the CPU number allowed (8)
+	-cpt	the CPU number allowed for each assembly task (8)
 
 --------------------------| other parameter |---------------------------
 
@@ -58,7 +61,7 @@ perl SOAPBarcode.pl <parameter>
 -----------------------------| Example |-------------------------------
 
 commond:
-perl SOAPBarcode.pl -lib test.lib -pri primer.fasta -int interval -pro y -out test -oop 2 -len 5 -mpr 0					
+perl SOAPBarcode.pl -lib test.lib -pri primer.fasta -int interval -pro y -out test -oop 2 -len 5 -mpr 0
 
 =cut
 
