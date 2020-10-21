@@ -18,7 +18,7 @@ use strict;
 use Getopt::Long;
 use FindBin qw($Bin $Script);
 use strict;
-
+use PerlIO::gzip;
 
 my ($Fq1,$Fq2,$Pri,$Out,$Len,$Mis,$Qua,$Help);
 
