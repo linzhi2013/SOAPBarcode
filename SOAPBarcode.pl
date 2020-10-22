@@ -7,7 +7,7 @@ This program is attempt to assemble standard COI barcode region with two librari
 =head1 Version
 
 version 4.0 
-modified by Guanliang Meng: 1) change usearch to vsearch.
+modified by Guanliang Meng: 1) change usearch to vsearch;
 
 version 3.0 
 modified: 1) protein express check can be skipped without setting -int and -pro n;
@@ -25,7 +25,8 @@ perl SOAPBarcode.pl <parameter>
 		
 ---------------| the sequence information of two libs |-----------------
 
-	-lib	lib file include information of all the raw data
+	-lib	lib file include information of all the raw data. Empty lines after
+		each "[LIB]" for each library will lead to bugs!!!
 
 -------------------------| denoise parameter|--------------------------
 
@@ -69,7 +70,7 @@ use strict;
 use Getopt::Long;
 use FindBin qw($Bin $Script);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
-my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
+my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf,$Resume);
 GetOptions(
 	"lib:s"=>\$Lib,
 	"pro:s"=>\$Pro,
@@ -94,6 +95,7 @@ GetOptions(
 	"out:s"=>\$Out,
 	"help"=>\$Help
 );
+# 	"resume"=>\$Resume,
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
 $Minimum ||=2;
@@ -116,21 +118,23 @@ open LIB, $Lib || die $!;
 my (@in_si, @lrl, @fastq, $in_sif,$in_sis,$lrlf,$lrls);
 while(<LIB>){
 	chomp;
+	next if(/^\s*$/); # mgl. fixed a bug if the lib file has emptt lines.
 	my ($a, $b, $c, $d);
-	if (/[LIB]/){
+	if (/\[LIB\]/){
 		chomp($a=<LIB>);
 		chomp($b=<LIB>);
 		chomp($c=<LIB>);
 		chomp($d=<LIB>);
+	
+		die "wrong lib file, makesure the second line represents the insertsize" unless ($a=~s/insertsize=//);
+		die "wrong lib file, makesure the second line represents the readlength" unless ($b=~s/readlength=//);
+		die "wrong lib file, makesure the second line represents the fastq 1" unless ($c=~s/fq1=//);
+		die "wrong lib file, makesure the second line represents the fastq 2" unless ($d=~s/fq2=//);
+		push @in_si, $a;
+		push @lrl, $b;
+		push @fastq, $c;
+		push @fastq, $d;
 	}
-	die "wrong lib file, makesure the second line represents the insertsize" unless ($a=~s/insertsize=//);
-	die "wrong lib file, makesure the second line represents the readlength" unless ($b=~s/readlength=//);
-	die "wrong lib file, makesure the second line represents the fastq 1" unless ($c=~s/fq1=//);
-	die "wrong lib file, makesure the second line represents the fastq 2" unless ($d=~s/fq2=//);
-	push @in_si, $a;
-	push @lrl, $b;
-	push @fastq, $c;
-	push @fastq, $d;
 }
 die "wrong lib file, make sure the lib file include two libs with pair end reads" unless (@in_si==2 && @lrl==2 && @fastq==4);
 if ($in_si[0] >= $in_si[1]){
@@ -170,12 +174,14 @@ my $full_out_pct=(100-$Ucf*100);
 while(<FLI>){
 	chomp;
 	my $dupout="$_".".dup";
-	`$binpath/bin/vsearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
+	`$binpath/bin/vsearch --derep_fulllength $_ --output $dupout --sizeout --strand both --minuniquesize 2`;
+	# `$binpath/bin/usearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
 	if ($Pro eq "y") {
 		my $proout="$_".".pro";
 		`perl $binpath/bin/Pro_C.pl -lib f -int $Interval -fas $dupout -out $proout`;
 		my $otuout="$_".".otu";
-		`$binpath/bin/vsearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch --cluster_size $proout --sizein --sizeout --id $Ucf --centroids $otuout`;
+		# $binpath/bin/usearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -201,7 +207,8 @@ while(<FLI>){
 		`rm $dupout $proout $otuout`;
 	}elsif ($Pro eq "n") {
 		my $otuout="$_".".otu";
-		`$binpath/bin/vsearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch --cluster_size $dupout --sizein --sizeout --id $Ucf --centroids $otuout`;
+		# `$binpath/bin/usearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -375,9 +382,11 @@ for my $key (keys %component){
 		my $abun_out="$component{$key}[2]"."A";
 		`perl $binpath/bin/sam_abundance.pl -fas $component{$key}[2] -sam bwa.sam -out $abun_out`;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/vsearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out`;
+		#`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out`;	
+		# `$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;
 		`rm $abun_out $sort_out`;
 	}elsif($com_num >1 && $Len>0){
 		my %chash;
@@ -407,9 +416,11 @@ for my $key (keys %component){
 		}
 		close COU;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/vsearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out`;
+		# `$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out`;
+		# `$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
 #		 `rm $abun_out $sort_out`;
 	}else{
 		print "there are problems of index length ($Len) and number of assembled reuslts ($com_num)\n";
