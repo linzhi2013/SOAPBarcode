@@ -6,6 +6,9 @@ This program is attempt to assemble standard COI barcode region with two librari
 
 =head1 Version
 
+version 4.0 
+modified by Guanliang Meng: 1) change usearch to vsearch;
+
 version 3.0 
 modified: 1) protein express check can be skipped without setting -int and -pro n;
 	  2) multiple primers with index ahead can be proccessed batching, however, if index
@@ -22,7 +25,8 @@ perl SOAPBarcode.pl <parameter>
 		
 ---------------| the sequence information of two libs |-----------------
 
-	-lib	lib file include information of all the raw data
+	-lib	lib file include information of all the raw data. Empty lines after
+		each "[LIB]" for each library will lead to bugs!!!
 
 -------------------------| denoise parameter|--------------------------
 
@@ -47,7 +51,7 @@ perl SOAPBarcode.pl <parameter>
 	-clb	the lower support branch cutoff (0.1)
 	-lms	the maximun extension length (660)
 	-lss	the minimun extension length (450)
-	-cpt	the CPU number allowed (8)
+	-cpt	the CPU number allowed for each assembly task (8)
 
 --------------------------| other parameter |---------------------------
 
@@ -58,7 +62,7 @@ perl SOAPBarcode.pl <parameter>
 -----------------------------| Example |-------------------------------
 
 commond:
-perl SOAPBarcode.pl -lib test.lib -pri primer.fasta -int interval -pro y -out test -oop 2 -len 5 -mpr 0					
+perl SOAPBarcode.pl -lib test.lib -pri primer.fasta -int interval -pro y -out test -oop 2 -len 5 -mpr 0
 
 =cut
 
@@ -66,7 +70,7 @@ use strict;
 use Getopt::Long;
 use FindBin qw($Bin $Script);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
-my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
+my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf,$Resume);
 GetOptions(
 	"lib:s"=>\$Lib,
 	"pro:s"=>\$Pro,
@@ -91,6 +95,7 @@ GetOptions(
 	"out:s"=>\$Out,
 	"help"=>\$Help
 );
+# 	"resume"=>\$Resume,
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
 $Minimum ||=2;
@@ -113,21 +118,23 @@ open LIB, $Lib || die $!;
 my (@in_si, @lrl, @fastq, $in_sif,$in_sis,$lrlf,$lrls);
 while(<LIB>){
 	chomp;
+	next if(/^\s*$/); # mgl. fixed a bug if the lib file has emptt lines.
 	my ($a, $b, $c, $d);
-	if (/[LIB]/){
+	if (/\[LIB\]/){
 		chomp($a=<LIB>);
 		chomp($b=<LIB>);
 		chomp($c=<LIB>);
 		chomp($d=<LIB>);
+	
+		die "wrong lib file, makesure the second line represents the insertsize" unless ($a=~s/insertsize=//);
+		die "wrong lib file, makesure the second line represents the readlength" unless ($b=~s/readlength=//);
+		die "wrong lib file, makesure the second line represents the fastq 1" unless ($c=~s/fq1=//);
+		die "wrong lib file, makesure the second line represents the fastq 2" unless ($d=~s/fq2=//);
+		push @in_si, $a;
+		push @lrl, $b;
+		push @fastq, $c;
+		push @fastq, $d;
 	}
-	die "wrong lib file, makesure the second line represents the insertsize" unless ($a=~s/insertsize=//);
-	die "wrong lib file, makesure the second line represents the readlength" unless ($b=~s/readlength=//);
-	die "wrong lib file, makesure the second line represents the fastq 1" unless ($c=~s/fq1=//);
-	die "wrong lib file, makesure the second line represents the fastq 2" unless ($d=~s/fq2=//);
-	push @in_si, $a;
-	push @lrl, $b;
-	push @fastq, $c;
-	push @fastq, $d;
 }
 die "wrong lib file, make sure the lib file include two libs with pair end reads" unless (@in_si==2 && @lrl==2 && @fastq==4);
 if ($in_si[0] >= $in_si[1]){
@@ -167,12 +174,14 @@ my $full_out_pct=(100-$Ucf*100);
 while(<FLI>){
 	chomp;
 	my $dupout="$_".".dup";
-	`$binpath/bin/usearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
+	`$binpath/bin/vsearch --derep_fulllength $_ --output $dupout --sizeout --strand both --minuniquesize 2`;
+	# `$binpath/bin/usearch -derep_fulllength $_ -output $dupout -sizeout -strand both -minuniquesize 2`;
 	if ($Pro eq "y") {
 		my $proout="$_".".pro";
 		`perl $binpath/bin/Pro_C.pl -lib f -int $Interval -fas $dupout -out $proout`;
 		my $otuout="$_".".otu";
-		`$binpath/bin/usearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch --cluster_size $proout --sizein --sizeout --id $Ucf --centroids $otuout`;
+		# $binpath/bin/usearch -cluster_otus $proout -otu_radius_pct $full_out_pct -otus $otuout
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -198,7 +207,8 @@ while(<FLI>){
 		`rm $dupout $proout $otuout`;
 	}elsif ($Pro eq "n") {
 		my $otuout="$_".".otu";
-		`$binpath/bin/usearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
+		`$binpath/bin/vsearch --cluster_size $dupout --sizein --sizeout --id $Ucf --centroids $otuout`;
+		# `$binpath/bin/usearch -cluster_otus $dupout -otu_radius_pct $full_out_pct -otus $otuout`;
 		my $endout="$_".".end";
 		open TEI, "$otuout" || die $!;
 		open TEO, ">$endout" || die $!;
@@ -298,12 +308,12 @@ print "the shotgun reads have been denoised";
 my %component;
 for my $i (0..$#flist){
 	my @a=split /\_|\./,$flist[$i];
-	$component{$a[2]}[0]=$flist[$i];
+	$component{$a[2]}[0]=$flist[$i]; # mgl: 0: *.end files from FLS
 }
 for my $i (0..$#slist){
 	my @a=split /\_|\./,$slist[$i];
 	if (exists $component{$a[2]}){
-		push @{$component{$a[2]}},$slist[$i];
+		push @{$component{$a[2]}},$slist[$i]; # mgl: 1: *.dup files from SLS
 	}
 }
 
@@ -331,6 +341,10 @@ for my $key (keys %component) {
         $seq=~s/\n//g;
         my $len=length $seq;
         my @a=split /\t/;
+        # >115_1_1        533 # mgl: only choose the first one
+        # >115_1_2        815
+        # >115_2_1        533
+        # >115_3_1        533
         my @b=split /\_/, $a[0];
         $aha{$b[1]}=0 unless(exists $aha{$b[1]});
         if ($b[2]==1){
@@ -346,7 +360,7 @@ for my $key (keys %component) {
 	close ASS;
 	close ASF;
 #	push @assembled, "$assout.contig.F";
-	push @{$component{$key}},"$assout.contig.F";
+	push @{$component{$key}},"$assout.contig.F"; # mgl: 2: *.contig.F files from barcode program
 	`rm $libout`;
 }
 
@@ -366,19 +380,23 @@ my $com_num=keys %component;
 for my $key (keys %component){
 	next unless (defined $component{$key}[2]);
 	if ($com_num==1 && $Len==0){
-		`$binpath/bin/bwa index $component{$key}[2]`;
-		`$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai`;
+		print "To obtain the abundance information by mapping SLS reads against assembled sequences\n"; # by mgl.
+		`$binpath/bin/bwa index $component{$key}[2]`; # mgl: *.contig.F files
+		`$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai`; # $s_bwa is *.pro files
 		`$binpath/bin/bwa samse $component{$key}[2] bwa.sai $s_bwa >bwa.sam`;
 		my $abun_out="$component{$key}[2]"."A";
 		`perl $binpath/bin/sam_abundance.pl -fas $component{$key}[2] -sam bwa.sam -out $abun_out`;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out`;
+		#`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out`;	
+		# `$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;
 		`rm $abun_out $sort_out`;
 	}elsif($com_num >1 && $Len>0){
+		print "To obtain the abundance information by extracting abundance from *.end files of FLS data\n"; # by mgl.
 		my %chash;
-		open CAS, "$component{$key}[2]" || die $!;
+		open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
 		$/="\>";<CAS>;$/="\n";
 		while(<CAS>){
 			chomp;
@@ -393,6 +411,7 @@ for my $key (keys %component){
 		open CFL, "$component{$key}[0]" || die $!;
 		while(<CFL>){
 			next unless (/^>/);
+			# >TACCT_179;size=1616
 			$chash{$cnum}[1]=$_ if (exists $chash{$cnum});
 			$cnum++;
 		}
@@ -404,9 +423,11 @@ for my $key (keys %component){
 		}
 		close COU;
 		my $sort_out="$abun_out"."S";
-		`$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
+		`$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out`;
+		# `$binpath/bin/usearch -sortbysize $abun_out -output $sort_out`;
 		my $cluster_out="$sort_out"."TA";
-		`$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
+		`$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out`;
+		# `$binpath/bin/vsearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;	
 #		 `rm $abun_out $sort_out`;
 	}else{
 		print "there are problems of index length ($Len) and number of assembled reuslts ($com_num)\n";
