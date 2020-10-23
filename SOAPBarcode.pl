@@ -6,8 +6,12 @@ This program is attempt to assemble standard COI barcode region with two librari
 
 =head1 Version
 
+version 4.1
+modified by Guanliang Meng: 1) add citation infor.
+
 version 4.0 
 modified by Guanliang Meng: 1) change usearch to vsearch;
+          2) small bug fixed (partially) for reading a lib file (-lib option).
 
 version 3.0 
 modified: 1) protein express check can be skipped without setting -int and -pro n;
@@ -63,6 +67,13 @@ perl SOAPBarcode.pl <parameter>
 
 commond:
 perl SOAPBarcode.pl -lib test.lib -pri primer.fasta -int interval -pro y -out test -oop 2 -len 5 -mpr 0
+
+=head1 Citation
+
+    Liu S, Li Y, Lu J, Su X, Tang M, Zhang R, Zhou L, Zhou C, Yang Q, Ji Y, Yu DW. 
+    SOAPBarcode: revealing arthropod biodiversity through assembly of Illumina
+    shotgun sequences of PCR amplicons. Methods in Ecology and Evolution. 2013 Dec;4(12):1142-50.
+    DOI: https://doi.org/10.1111/2041-210X.12120
 
 =cut
 
