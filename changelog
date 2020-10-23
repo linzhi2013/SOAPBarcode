@@ -5,9 +5,9 @@ v5.0 (planing)
 for logging.
 4. add checkpoint, so that we can resume the jobs.
 
-v4.0 (planing)
+v4.0
 1. change usearch to vesearch.
-2. partially fixed a bug during read the lib file (-lib).
+2. partially fixed a bug during read the lib file (-lib option).
 
 v3.0
 from Shanlin Liu
