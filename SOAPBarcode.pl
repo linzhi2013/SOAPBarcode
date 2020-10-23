@@ -308,12 +308,12 @@ print "the shotgun reads have been denoised";
 my %component;
 for my $i (0..$#flist){
 	my @a=split /\_|\./,$flist[$i];
-	$component{$a[2]}[0]=$flist[$i];
+	$component{$a[2]}[0]=$flist[$i]; # mgl: 0: *.end files from FLS
 }
 for my $i (0..$#slist){
 	my @a=split /\_|\./,$slist[$i];
 	if (exists $component{$a[2]}){
-		push @{$component{$a[2]}},$slist[$i];
+		push @{$component{$a[2]}},$slist[$i]; # mgl: 1: *.dup files from SLS
 	}
 }
 
@@ -341,6 +341,10 @@ for my $key (keys %component) {
         $seq=~s/\n//g;
         my $len=length $seq;
         my @a=split /\t/;
+        # >115_1_1        533 # mgl: only choose the first one
+        # >115_1_2        815
+        # >115_2_1        533
+        # >115_3_1        533
         my @b=split /\_/, $a[0];
         $aha{$b[1]}=0 unless(exists $aha{$b[1]});
         if ($b[2]==1){
@@ -356,7 +360,7 @@ for my $key (keys %component) {
 	close ASS;
 	close ASF;
 #	push @assembled, "$assout.contig.F";
-	push @{$component{$key}},"$assout.contig.F";
+	push @{$component{$key}},"$assout.contig.F"; # mgl: 2: *.contig.F files from barcode program
 	`rm $libout`;
 }
 
@@ -376,8 +380,9 @@ my $com_num=keys %component;
 for my $key (keys %component){
 	next unless (defined $component{$key}[2]);
 	if ($com_num==1 && $Len==0){
-		`$binpath/bin/bwa index $component{$key}[2]`;
-		`$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai`;
+		print "To obtain the abundance information by mapping SLS reads against assembled sequences\n"; # by mgl.
+		`$binpath/bin/bwa index $component{$key}[2]`; # mgl: *.contig.F files
+		`$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai`; # $s_bwa is *.pro files
 		`$binpath/bin/bwa samse $component{$key}[2] bwa.sai $s_bwa >bwa.sam`;
 		my $abun_out="$component{$key}[2]"."A";
 		`perl $binpath/bin/sam_abundance.pl -fas $component{$key}[2] -sam bwa.sam -out $abun_out`;
@@ -389,8 +394,9 @@ for my $key (keys %component){
 		# `$binpath/bin/usearch -cluster_otus $sort_out -otu_radius_pct $full_out_pct -otus $cluster_out`;
 		`rm $abun_out $sort_out`;
 	}elsif($com_num >1 && $Len>0){
+		print "To obtain the abundance information by extracting abundance from *.end files of FLS data\n"; # by mgl.
 		my %chash;
-		open CAS, "$component{$key}[2]" || die $!;
+		open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
 		$/="\>";<CAS>;$/="\n";
 		while(<CAS>){
 			chomp;
@@ -405,6 +411,7 @@ for my $key (keys %component){
 		open CFL, "$component{$key}[0]" || die $!;
 		while(<CFL>){
 			next unless (/^>/);
+			# >TACCT_179;size=1616
 			$chash{$cnum}[1]=$_ if (exists $chash{$cnum});
 			$cnum++;
 		}
