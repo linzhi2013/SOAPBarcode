@@ -573,6 +573,6 @@ $logger->info("all done");
 
 sub run_cmd {
     my ($logger, $prefix_msg, $cmd, $post_msg) = @_;
-    $logger->info("$prefix_msg\n$cmd\n$post_msg");
-    system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd");
+    $logger->info("$prefix_msg\n$cmd\n$post_msg\n");
+    system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd\n");
 }
