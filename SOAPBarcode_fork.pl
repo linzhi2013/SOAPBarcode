@@ -71,6 +71,9 @@ perl SOAPBarcode.pl <parameter>
     -out    prefix of name of output file
     -ptask  the maximum paralle tasks allowed (1)
     -sge    submit the assembly tasks to SGE cluster to run, default local.
+    -qsubt  qsub command template, default 'qsub -cwd -l vf={vf} -pe smp {cpu}'.
+            You always have the variables '{vf}' and '{cpu}'.
+    -avf    the '{vf}' value for each assembly task ('50G')
     -resume Resume the run.
     -help   print out this information
     -debug  Debug mode
@@ -99,7 +102,7 @@ use Parallel::ForkManager;
 
 my $logger = get_logger("SOAPBarcode");
 
-my ($Debug, $Parallel_task, $submit_sge, $resume);
+my ($Debug, $Parallel_task, $submit_sge, $resume, $avf);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
 my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
 GetOptions(
@@ -127,6 +130,9 @@ GetOptions(
     "debug"=>\$Debug,
     "ptask:i"=>\$Parallel_task,
     "sge"=>\$submit_sge,
+    "qsubt"=>\$qsubt,
+    "avf"=>\$avf,
+    "resume"=>\$resume,
     "help"=>\$Help
 );
 
@@ -157,6 +163,8 @@ if ($Parallel_task == 1){
 if ($Parallel_task < 0) {
     $logger->error("-ptask must be >= 0");
 }
+
+$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}'
 
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
@@ -237,7 +245,9 @@ if ($Mpr == 0){
         "$Ffq + $Bfq --> $f_out\_list",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 }else{
     run_task($logger,
         "Assign_FLS2DiffSamples_By_Tag",
@@ -246,7 +256,9 @@ if ($Mpr == 0){
         "$Ffq + $Bfq --> $f_out\_list",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 }
 $logger->info("fq1=$Ffq\nfq2=$Bfq\nreads has been assigned\n", "FLS files for all samples are in $f_out\_list\n");
 
@@ -258,12 +270,12 @@ $pm_fls_denoise->run_on_finish( sub {
     print "** $ident just got out of the pool ".
       "with PID $pid and exit code: $exit_code\n";
 });
- 
+
 $pm_fls_denoise->run_on_start( sub {
     my ($pid, $ident)=@_;
     print "** $ident started, pid: $pid\n";
 });
- 
+
 $pm_fls_denoise->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
@@ -288,7 +300,9 @@ while(<FLI>){
         "$_ --> $dupout",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 
     if ($Pro eq "y") {
         my $proout="$_".".pro";
@@ -299,7 +313,9 @@ while(<FLI>){
             "$dupout --> $proout",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $otuout="$_".".otu";
         run_task($logger,
@@ -309,7 +325,9 @@ while(<FLI>){
             "$proout --> $otuout",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -346,7 +364,9 @@ while(<FLI>){
             "$dupout --> $otuout",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -408,7 +428,9 @@ if ($Oop ==1 ){
         "$Fsfq + $Bsfq --> $Out4",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 }elsif ($Oop ==2){
     my $pear_min=$lrls+1;
     my $pear_mio=$cmrl;
@@ -419,8 +441,10 @@ if ($Oop ==1 ){
         "$Fsfq + $Bsfq --> $Out4",
         $resume,
         $submit_sge,
-        "-pe smp 1");
-    
+        $qsubt,
+        "500M",
+        1);
+
 }else{
     $logger->error("the overlap program can be setted as 1 for COPE and as 2 for PEAR");
 }
@@ -435,7 +459,9 @@ if ($Mpr ==0){
         "$Out4 --> $s_out\_list",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 }else{
     run_task($logger,
         "Assign_SLS2DiffSamples_By_Taga",
@@ -444,7 +470,9 @@ if ($Mpr ==0){
         "$Out4 --> $s_out\_list",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 }
 $logger->info("Shotgun reads ($Out4) has been assigned\n", "SLS files for all samples are in $s_out\_list\n");
 
@@ -457,12 +485,12 @@ $pm_sls_denoise->run_on_finish( sub {
     print "** $ident just got out of the pool ".
       "with PID $pid and exit code: $exit_code\n";
 });
- 
+
 $pm_sls_denoise->run_on_start( sub {
     my ($pid, $ident)=@_;
     print "** $ident started, pid: $pid\n";
 });
- 
+
 $pm_sls_denoise->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
@@ -490,7 +518,9 @@ while (<MLI>) {
             "$_ --> $proout",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         run_cmd($logger,
             "Renaming $proout to $sortout",
@@ -505,7 +535,7 @@ while (<MLI>) {
         $logger->error("-pro parameter should be y or n for protein expression check option");
     }
     my $dupout="$_".".dup";
-    
+
     run_task($logger,
         "FLS_Dereplication",
         "Dereplication of SLS data:",
@@ -513,7 +543,9 @@ while (<MLI>) {
         "$sortout --> $dupout",
         $resume,
         $submit_sge,
-        "-pe smp 1");
+        $qsubt,
+        "500M",
+        1);
 
 #   print MDU "$dupout\n";
     # push @slist, $dupout; # mgl: no use in paralle task
@@ -591,7 +623,7 @@ for my $key (keys %component) {
     open LIB, ">$libout" || die $!;
     print LIB ">\nf=./$component{$key}[1]";
     close LIB;
-    my $assout="$Out\_$key"; 
+    my $assout="$Out\_$key";
 
     run_task($logger,
         "barcode_assembly.$key",
@@ -600,8 +632,10 @@ for my $key (keys %component) {
         "Result file: $assout.contig",
         $resume,
         $submit_sge,
-        "-pe smp $Cpt");
-    
+        $qsubt,
+        $avf,
+        $Cpt);
+
     $logger->info("Choose the first isoform for each locus:\n $assout.contig --> $assout.contig.F");
     open ASS, "$assout.contig" || die $!;
     open ASF, ">$assout.contig.F" || die $!;
@@ -670,12 +704,12 @@ $pm_abundance->run_on_finish( sub {
     print "** $ident just got out of the pool ".
       "with PID $pid and exit code: $exit_code\n";
 });
- 
+
 $pm_abundance->run_on_start( sub {
     my ($pid, $ident)=@_;
     print "** $ident started, pid: $pid\n";
 });
- 
+
 $pm_abundance->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
@@ -699,7 +733,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         run_task($logger,
             "$component{$key}[2].bwa.aln",
@@ -708,7 +744,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp $Cpt ");
+            $qsubt,
+            "2G",
+            $Cpt);
 
         run_task($logger,
             "$component{$key}[2].bwa.samse",
@@ -717,7 +755,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "1G",
+            1);
 
         my $abun_out="$component{$key}[2]"."A";
         run_task($logger,
@@ -727,7 +767,9 @@ for my $key (keys %component){
             "$component{$key}[2] + bwa.sam --> $abun_out",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $sort_out="$abun_out"."S";
         run_task($logger,
@@ -737,7 +779,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $cluster_out="$sort_out"."TA";
         run_task($logger,
@@ -747,7 +791,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         run_cmd($logger,
             "Removing $abun_out $sort_out",
@@ -791,7 +837,9 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
+            $qsubt,
+            "500M",
+            1);
 
         my $cluster_out="$sort_out"."TA";
         run_task($logger,
@@ -801,8 +849,10 @@ for my $key (keys %component){
             "",
             $resume,
             $submit_sge,
-            "-pe smp 1");
-        
+            $qsubt,
+            "500M",
+            1);
+
 #        `rm $abun_out $sort_out`;
     }else{
         $logger->error("there are problems of index length ($Len) and number of assembled reuslts ($com_num)");
@@ -828,8 +878,8 @@ sub run_cmd {
 
 
 sub run_task{
-    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $sge_options) = @_;
-    
+    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu) = @_;
+
     my $done_file = "tmp.$job_iden.done";
     if ($resume and -e $done_file) {
         return 0;
@@ -862,7 +912,9 @@ END_MESSAGE2
         print OUT $message2;
         close OUT;
 
-        my $submit_sge = "qsub -cwd $sge_options $shell_file";
+        $qsubt=~s/\{vf\}/$vf/g;
+        $qsubt=~s/\{cpu\}/$cpu/g;
+        my $submit_sge = "$qsubt $shell_file";
         system("$submit_sge") == 0
             or $logger->error("Command Failed:\n$submit_sge\n");
 
