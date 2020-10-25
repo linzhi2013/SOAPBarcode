@@ -596,12 +596,12 @@ $pm_assemble->run_on_finish( sub {
     print "** $ident just got out of the pool ".
       "with PID $pid and exit code: $exit_code\n";
 });
- 
+
 $pm_assemble->run_on_start( sub {
     my ($pid, $ident)=@_;
     print "** $ident started, pid: $pid\n";
 });
- 
+
 $pm_assemble->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
@@ -929,34 +929,6 @@ END_MESSAGE2
         system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd\n");
         system("touch $done_file") == 0 or $logger->error("Command Failed:\ntouch $done_file\n");
     }
-
-}
-
-
-sub run_sge{
-    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $sge_options) = @_;
-
-    my $shell_file = "tmp.$job_iden.sh";
-    my $done_file = "$shell_file.done";
-    open OUT, ">$shell_file" or die $!;
-    #print OUT "#!/usr/bin/bash\n";
-    print OUT "set -vex\n";
-    print OUT "echo $prefix_msg\n";
-    print OUT "$cmd\n";
-    print OUT "echo $post_msg\n";
-    print OUT "touch $done_file\n";
-    close OUT;
-
-    my $submit_sge = "qsub -cwd $sge_options $shell_file";
-    system("$submit_sge") == 0
-        or $logger->error("Command Failed:\n$submit_sge\n");
-
-    while (1) {
-        sleep 10;
-        last if (-e "$done_file");
-    }
-
-    $logger->info("Command finished:\n$submit_sge\n");
 
 }
 
