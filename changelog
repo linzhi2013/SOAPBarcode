@@ -1,13 +1,13 @@
 v5.0 (planing)
 1. support for SGE cluster;
 2. support for lauching multiple assembly tasks at the assembly step.
-3. use log2perl module (https://www.perl.com/pub/2002/09/11/log4perl.html/)
-for logging.
-4. add checkpoint, so that we can resume the jobs.
+3. add checkpoint, so that we can resume the jobs.
 
-v4.0
+v4.2
 1. change usearch to vesearch.
 2. partially fixed a bug during read the lib file (-lib option).
+3. use log4perl module (https://www.perl.com/pub/2002/09/11/log4perl.html/)
+for logging.
 
 v3.0
 from Shanlin Liu
