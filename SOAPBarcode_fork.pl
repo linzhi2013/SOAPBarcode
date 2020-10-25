@@ -679,7 +679,7 @@ for my $key (keys %component){
             "rm $abun_out $sort_out", "");
 
     }elsif($com_num >1 && $Len>0){
-        $logger->info("To obtain the abundance information for $component{$key}[2] by extracting 'size' info from $component{$key}[0] of FLS data --> $component{$key}[2].A");
+        $logger->info("To obtain the abundance information for $component{$key}[2] by extracting 'size' info from $component{$key}[0] of FLS data --> $component{$key}[2]A");
         my %chash;
         open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
         $/="\>";<CAS>;$/="\n";
@@ -746,7 +746,7 @@ sub run_sge{
     my $shell_file = "tmp.$job_iden.sh";
     my $done_file = "$shell_file.done";
     open OUT, ">$shell_file" or die $!;
-    print OUT "/usr/bin/bash\n";
+    print OUT "#!/usr/bin/bash\n";
     print OUT "set -vex\n";
     print OUT "echo $prefix_msg\n";
     print OUT "$cmd\n";

@@ -523,7 +523,7 @@ for my $key (keys %component){
             "rm $abun_out $sort_out", "");
 
     }elsif($com_num >1 && $Len>0){
-        $logger->info("To obtain the abundance information for $component{$key}[2] by extracting 'size' info from $component{$key}[0] of FLS data --> $component{$key}[2].A");
+        $logger->info("To obtain the abundance information for $component{$key}[2] by extracting 'size' info from $component{$key}[0] of FLS data --> $component{$key}[2]A");
         my %chash;
         open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
         $/="\>";<CAS>;$/="\n";
