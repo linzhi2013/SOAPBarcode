@@ -85,7 +85,7 @@ use strict;
 use Getopt::Long;
 use FindBin qw($Bin $Script);
 use Log::Log4perl qw(get_logger :levels);
-# use Log::Dispatch;
+use Log::Dispatch;
 
 my $logger = get_logger("SOAPBarcode");
 
@@ -124,12 +124,12 @@ if(defined $Debug) {
     $logger->level($INFO);
 }
 
-# my $appender = Log::Log4perl::Appender->new(
-#    "Log::Dispatch::File",
-#    filename => "SOAPBarcode.log",
-#    mode     => "append",
-# );
-# $logger->add_appender($appender);
+my $appender = Log::Log4perl::Appender->new(
+    "Log::Dispatch::File",
+    filename => "SOAPBarcode.log",
+    mode     => "append",
+ );
+ $logger->add_appender($appender);
 # DEBUG
 # INFO
 # WARN
