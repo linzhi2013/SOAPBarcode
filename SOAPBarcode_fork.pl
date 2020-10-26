@@ -100,8 +100,8 @@ use Log::Log4perl qw(get_logger :levels);
 use Log::Dispatch;
 use Parallel::ForkManager;
 use Env qw(PATH PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT);
-use Cwd;
-
+# use Cwd;
+use Cwd qw(getcwd abs_path);
 
 my $workdir = getcwd;
 
@@ -171,11 +171,21 @@ if ($Parallel_task < 0) {
 }
 
 $qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}' if (!defined $qsubt);
+$avf ||= "50G";
 $tmpdir = './tmp.soapbarcode' if (!defined $tmpdir);
-run_cmd($logger,
-    "Creating $tmpdir directory",
-    "mkdir -p $tmpdir",
-    '');
+
+# for testing
+if (-e "$tmpdir") {
+    $logger->info("$tmpdir exists\n!")
+}else{
+    system("mkdir -p $tmpdir",)
+}
+$tmpdir = abs_path($tmpdir);
+
+# run_cmd($logger,
+#    "Creating $tmpdir directory",
+#    "mkdir -p $tmpdir",
+#    '');
 
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
@@ -479,7 +489,7 @@ $logger->info("$Fsfq and $Bsfq: the shotgun reads have been overlapped, result f
 my $s_out="$Out"."_s";
 if ($Mpr ==0){
     run_task($logger,
-        "Assign_SLS2DiffSamples_By_Taga",
+        "Assign_SLS2DiffSamples_By_Tag",
         "Assign SLS data to different samples:",
         "perl $binpath/bin/shotgun_assign.perfect.pl -pri $Primer -fas $Out4 -out $s_out -mis $Mpr -len $Len",
         "$Out4 --> $s_out\_list",
@@ -492,7 +502,7 @@ if ($Mpr ==0){
         $tmpdir);
 }else{
     run_task($logger,
-        "Assign_SLS2DiffSamples_By_Taga",
+        "Assign_SLS2DiffSamples_By_Tag",
         "Assign SLS data to different samples:",
         "perl $binpath/bin/shotgun_assign.pl -pri $Primer -fas $Out4 -out $s_out -mis $Mpr -len $Len",
         "$Out4 --> $s_out\_list",
@@ -565,8 +575,8 @@ while (<MLI>) {
     }else{
         $logger->error("-pro parameter should be y or n for protein expression check option");
     }
-    my $dupout="$_".".dup";
 
+    my $dupout="$_".".dup";
     run_task($logger,
         "FLS_Dereplication.$dupout",
         "Dereplication of SLS data:",
@@ -638,7 +648,7 @@ $pm_assemble->run_on_start( sub {
 $pm_assemble->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
-  0.5
+  300
 );
 
 BARCODE_ASSEMBLE:
@@ -651,17 +661,17 @@ for my $key (keys %component) {
     # Forks and returns the pid for the child:
     my $pid = $pm_assemble->start($key) and next BARCODE_ASSEMBLE;
 
-    my $libout="$key\.lib";
+    my $libout="$tmpdir/$key\.lib";
     $logger->info("Preparing $libout for sample $key");
     open LIB, ">$libout" || die $!;
-    print LIB ">\nf=./$component{$key}[1]";
+    print LIB ">\nf=$workdir/$component{$key}[1]";
     close LIB;
     my $assout="$Out\_$key";
 
     run_task($logger,
         "barcode_assembly.$key",
         "Let's assemble $key:",
-        "$binpath/bin/barcode -e $component{$key}[0] -r $libout -l $Lsk -k $Lmk -o $assout -v $Kin -c $Clk -s $Clb -n $Lss -x $Lms -t $Cpt 1>$key.barcode.log 2>$key.barcode.err",
+        "$binpath/bin/barcode -e $component{$key}[0] -r $libout -l $Lsk -k $Lmk -o $assout -v $Kin -c $Clk -s $Clb -n $Lss -x $Lms -t $Cpt 1>$tmpdir/$key.barcode.log 2>$tmpdir/$key.barcode.err",
         "Result file: $assout.contig",
         $resume,
         $submit_sge,
@@ -705,7 +715,6 @@ for my $key (keys %component) {
 #   push @assembled, "$assout.contig.F";
     # below: mgl: no use in paralle task
     # push @{$component{$key}},"$assout.contig.F"; # mgl: 2: *.contig.F files from barcode program
-    # `rm $libout`;
 
     $pm_assemble->finish;
 }
