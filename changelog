@@ -4,6 +4,11 @@ v5.0 (planing)
 3. add checkpoint, so that we can resume the jobs.
 4. protein-tranlsation check and filter out the ones have stop codons
 (codon-based alignment with a reference? Or just DNA-alignment???)
+
+Maybe: the output contig by the 'barcode' program is always 5'->3' (ask
+shanlin to double confirm), so we translate the contig from frame 1, 2, 3.
+If all frames have stop codons, we remove this contig.
+
 5. remove the barcodes contig with 0X-depth
 
 v4.2
