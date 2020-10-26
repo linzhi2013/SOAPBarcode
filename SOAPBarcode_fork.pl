@@ -75,6 +75,7 @@ perl SOAPBarcode.pl <parameter>
             You always have the variables '{vf}' and '{cpu}'.
     -avf    the '{vf}' value for each assembly task ('50G')
     -resume Resume the run.
+    -tmpdir tmp directory path (./tmp.soapbarcode)
     -help   print out this information
     -debug  Debug mode
 
@@ -103,7 +104,7 @@ use Env qw(PATH PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT);
 
 my $logger = get_logger("SOAPBarcode");
 
-my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt);
+my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt, $tmpdir);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
 my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
 GetOptions(
@@ -134,6 +135,7 @@ GetOptions(
     "qsubt"=>\$qsubt,
     "avf"=>\$avf,
     "resume"=>\$resume,
+    "tmpdir:s"=>\$tmpdir,
     "help"=>\$Help
 );
 
@@ -165,7 +167,12 @@ if ($Parallel_task < 0) {
     $logger->error("-ptask must be >= 0");
 }
 
-$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}';
+$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}' if (!defined $qsubt);
+$tmpdir = './tmp.soapbarcode' if (!defined $tmpdir);
+run_cmd($logger,
+    "Creating $tmpdir directory",
+    "mkdir -p $tmpdir",
+    '');
 
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
@@ -248,7 +255,8 @@ if ($Mpr == 0){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 }else{
     run_task($logger,
         "Assign_FLS2DiffSamples_By_Tag",
@@ -259,7 +267,8 @@ if ($Mpr == 0){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 }
 $logger->info("fq1=$Ffq\nfq2=$Bfq\nreads has been assigned\n", "FLS files for all samples are in $f_out\_list\n");
 
@@ -303,7 +312,8 @@ while(<FLI>){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 
     if ($Pro eq "y") {
         my $proout="$_".".pro";
@@ -316,8 +326,8 @@ while(<FLI>){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
-
+            1,
+            $tmpdir);
         my $otuout="$_".".otu";
         run_task($logger,
             "FLS_CLUSTER.$otuout",
@@ -328,7 +338,8 @@ while(<FLI>){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -367,7 +378,8 @@ while(<FLI>){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -431,7 +443,8 @@ if ($Oop ==1 ){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 }elsif ($Oop ==2){
     my $pear_min=$lrls+1;
     my $pear_mio=$cmrl;
@@ -444,7 +457,8 @@ if ($Oop ==1 ){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 
 }else{
     $logger->error("the overlap program can be setted as 1 for COPE and as 2 for PEAR");
@@ -462,7 +476,8 @@ if ($Mpr ==0){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 }else{
     run_task($logger,
         "Assign_SLS2DiffSamples_By_Taga",
@@ -473,7 +488,8 @@ if ($Mpr ==0){
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 }
 $logger->info("Shotgun reads ($Out4) has been assigned\n", "SLS files for all samples are in $s_out\_list\n");
 
@@ -521,8 +537,8 @@ while (<MLI>) {
             $submit_sge,
             $qsubt,
             "500M",
-            1);
-
+            1,
+            $tmpdir);
         run_cmd($logger,
             "Renaming $proout to $sortout",
             "mv $proout $sortout", "");
@@ -546,7 +562,8 @@ while (<MLI>) {
         $submit_sge,
         $qsubt,
         "500M",
-        1);
+        1,
+        $tmpdir);
 
 #   print MDU "$dupout\n";
     # push @slist, $dupout; # mgl: no use in paralle task
@@ -635,7 +652,8 @@ for my $key (keys %component) {
         $submit_sge,
         $qsubt,
         $avf,
-        $Cpt);
+        $Cpt,
+        $tmpdir);
 
     $logger->info("Choose the first isoform for each locus:\n $assout.contig --> $assout.contig.F");
     open ASS, "$assout.contig" || die $!;
@@ -736,7 +754,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         run_task($logger,
             "$component{$key}[2].bwa.aln",
@@ -747,7 +766,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "2G",
-            $Cpt);
+            $Cpt,
+            $tmpdir);
 
         run_task($logger,
             "$component{$key}[2].bwa.samse",
@@ -758,7 +778,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "1G",
-            1);
+            1,
+            $tmpdir);
 
         my $abun_out="$component{$key}[2]"."A";
         run_task($logger,
@@ -770,7 +791,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         my $sort_out="$abun_out"."S";
         run_task($logger,
@@ -782,7 +804,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
         run_task($logger,
@@ -794,8 +817,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
-
+            1,
+            $tmpdir);
         run_cmd($logger,
             "Removing $abun_out $sort_out",
             "rm $abun_out $sort_out", "");
@@ -840,7 +863,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
         run_task($logger,
@@ -852,7 +876,8 @@ for my $key (keys %component){
             $submit_sge,
             $qsubt,
             "500M",
-            1);
+            1,
+            $tmpdir);
 
 #        `rm $abun_out $sort_out`;
     }else{
@@ -879,9 +904,11 @@ sub run_cmd {
 
 
 sub run_task{
-    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu) = @_;
+    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu, $tmpdir) = @_;
+    my $done_file = "$tmpdir/$job_iden.done";
+    my $stderr_file = "$tmpdir/$job_iden.error";
+    my $stdout_file = "$tmpdir/$job_iden.log";
 
-    my $done_file = "tmp.$job_iden.done";
     if ($resume and -e $done_file) {
         $logger->info("Use existing result for step $job_iden\n");
         return 0;
@@ -897,11 +924,11 @@ sub run_task{
 ############################################
 # You may need to adapt this manually!!! ###
 ############################################
-export PATH=$PATH
-export PERL5LIB=$PERL5LIB
-export PERL_LOCAL_LIB_ROOT=$PERL_LOCAL_LIB_ROOT
-export PERL_MB_OPT=$PERL_MB_OPT
-export PERL_MM_OPT=$PERL_MM_OPT
+export PATH='$PATH'
+export PERL5LIB='$PERL5LIB'
+export PERL_LOCAL_LIB_ROOT='$PERL_LOCAL_LIB_ROOT'
+export PERL_MB_OPT='$PERL_MB_OPT'
+export PERL_MM_OPT='$PERL_MM_OPT'
 
 set -vex
 echo "$prefix_msg"
@@ -915,7 +942,7 @@ END_MESSAGE
 
         $qsubt=~s/\{vf\}/$vf/g;
         $qsubt=~s/\{cpu\}/$cpu/g;
-        my $submit_sge = "$qsubt $shell_file";
+        my $submit_sge = "$qsubt -e $stderr_file -o $stdout_file $shell_file";
         system("$submit_sge") == 0
             or $logger->error("Command Failed:\n$submit_sge\n");
 
