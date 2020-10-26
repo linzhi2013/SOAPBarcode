@@ -9,7 +9,8 @@ This program is attempt to assemble standard COI barcode region with two librari
 version 4.3
 modified by Guanliang Meng: 1) use Parallel::ForkManager to deal with
 multi-samples at the same time;
-2) support local and SGE for each sample assembly.
+2) support running tasks on localhost and SGE cluster;
+3) support resumption of running tasks.
 
 version 4.2
 modified by Guanliang Meng: 1) use Log::Log4perl and Log::Dispatch for logging.
@@ -174,18 +175,6 @@ $qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}' if (!defined $qsubt);
 $avf ||= "50G";
 $tmpdir = './tmp.soapbarcode' if (!defined $tmpdir);
 
-# for testing
-if (-e "$tmpdir") {
-    $logger->info("$tmpdir exists\n!")
-}else{
-    system("mkdir -p $tmpdir",)
-}
-$tmpdir = abs_path($tmpdir);
-
-# run_cmd($logger,
-#    "Creating $tmpdir directory",
-#    "mkdir -p $tmpdir",
-#    '');
 
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
@@ -211,6 +200,13 @@ if (!$Pro eq "y" and !$Pro eq "n"){
 if (!$Oop == 1 and !$Oop == 2){
     $logger->error("-oop parameter should be setted as 1 for COPE and as 2 for PEAR");
 }
+
+if (-e "$tmpdir") {
+    $logger->info("$tmpdir exists\n!")
+}else{
+    system("mkdir -p $tmpdir",)
+}
+$tmpdir = abs_path($tmpdir);
 
 open LIB, $Lib || die $!;
 my (@in_si, @lrl, @fastq, $in_sif,$in_sis,$lrlf,$lrls);

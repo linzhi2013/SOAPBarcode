@@ -2,6 +2,8 @@ v5.0 (planing)
 1. support for SGE cluster;
 2. support for lauching multiple assembly tasks at the assembly step.
 3. add checkpoint, so that we can resume the jobs.
+4. protein-tranlsation check and filter out the ones have stop codons
+(codon-based alignment with a reference? Or just DNA-alignment???)
 
 v4.2
 1. change usearch to vesearch.
