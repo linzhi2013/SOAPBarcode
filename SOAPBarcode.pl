@@ -947,8 +947,8 @@ sub run_task{
     }
 
     if ($submit_sge) {
-        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will be submitted to SGE\n");
         my $shell_file = "$tmpdir/$job_iden.sh";
+        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will be submitted to SGE --> $shell_file\n");
         open OUT, ">$shell_file" or die $!;
         # print OUT "#!/usr/bin/bash\n";
         my $message = <<"END_MESSAGE";
