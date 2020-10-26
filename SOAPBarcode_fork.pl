@@ -100,7 +100,10 @@ use Log::Log4perl qw(get_logger :levels);
 use Log::Dispatch;
 use Parallel::ForkManager;
 use Env qw(PATH PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT);
+use Cwd;
 
+
+my $workdir = getcwd;
 
 my $logger = get_logger("SOAPBarcode");
 
@@ -256,6 +259,7 @@ if ($Mpr == 0){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 }else{
     run_task($logger,
@@ -268,6 +272,7 @@ if ($Mpr == 0){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 }
 $logger->info("fq1=$Ffq\nfq2=$Bfq\nreads has been assigned\n", "FLS files for all samples are in $f_out\_list\n");
@@ -313,6 +318,7 @@ while(<FLI>){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 
     if ($Pro eq "y") {
@@ -327,6 +333,7 @@ while(<FLI>){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
         my $otuout="$_".".otu";
         run_task($logger,
@@ -339,6 +346,7 @@ while(<FLI>){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         my $endout="$_".".end";
@@ -379,6 +387,7 @@ while(<FLI>){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         my $endout="$_".".end";
@@ -444,6 +453,7 @@ if ($Oop ==1 ){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 }elsif ($Oop ==2){
     my $pear_min=$lrls+1;
@@ -458,6 +468,7 @@ if ($Oop ==1 ){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 
 }else{
@@ -477,6 +488,7 @@ if ($Mpr ==0){
         $qsubt,
         "500M",
         1,
+        $workdir, 
         $tmpdir);
 }else{
     run_task($logger,
@@ -489,6 +501,7 @@ if ($Mpr ==0){
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 }
 $logger->info("Shotgun reads ($Out4) has been assigned\n", "SLS files for all samples are in $s_out\_list\n");
@@ -538,6 +551,7 @@ while (<MLI>) {
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
         run_cmd($logger,
             "Renaming $proout to $sortout",
@@ -563,6 +577,7 @@ while (<MLI>) {
         $qsubt,
         "500M",
         1,
+        $workdir,
         $tmpdir);
 
 #   print MDU "$dupout\n";
@@ -653,6 +668,7 @@ for my $key (keys %component) {
         $qsubt,
         $avf,
         $Cpt,
+        $workdir,
         $tmpdir);
 
     $logger->info("Choose the first isoform for each locus:\n $assout.contig --> $assout.contig.F");
@@ -755,6 +771,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         run_task($logger,
@@ -767,6 +784,7 @@ for my $key (keys %component){
             $qsubt,
             "2G",
             $Cpt,
+            $workdir,
             $tmpdir);
 
         run_task($logger,
@@ -779,6 +797,7 @@ for my $key (keys %component){
             $qsubt,
             "1G",
             1,
+            $workdir,
             $tmpdir);
 
         my $abun_out="$component{$key}[2]"."A";
@@ -792,6 +811,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         my $sort_out="$abun_out"."S";
@@ -805,6 +825,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
@@ -818,6 +839,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
         run_cmd($logger,
             "Removing $abun_out $sort_out",
@@ -864,6 +886,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
@@ -877,6 +900,7 @@ for my $key (keys %component){
             $qsubt,
             "500M",
             1,
+            $workdir,
             $tmpdir);
 
 #        `rm $abun_out $sort_out`;
@@ -904,7 +928,7 @@ sub run_cmd {
 
 
 sub run_task{
-    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu, $tmpdir) = @_;
+    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu, $workdir, $tmpdir) = @_;
     my $done_file = "$tmpdir/$job_iden.done";
     my $stderr_file = "$tmpdir/$job_iden.error";
     my $stdout_file = "$tmpdir/$job_iden.log";
@@ -917,7 +941,7 @@ sub run_task{
     }
 
     if ($submit_sge) {
-        my $shell_file = "tmp.$job_iden.sh";
+        my $shell_file = "$tmpdir/$job_iden.sh";
         open OUT, ">$shell_file" or die $!;
         # print OUT "#!/usr/bin/bash\n";
         my $message = <<"END_MESSAGE";
@@ -929,6 +953,8 @@ export PERL5LIB='$PERL5LIB'
 export PERL_LOCAL_LIB_ROOT='$PERL_LOCAL_LIB_ROOT'
 export PERL_MB_OPT='$PERL_MB_OPT'
 export PERL_MM_OPT='$PERL_MM_OPT'
+
+cd "$workdir"
 
 set -vex
 echo "$prefix_msg"
