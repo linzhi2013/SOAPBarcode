@@ -250,7 +250,7 @@ my @flist;
 my $binpath= $Bin;
 if ($Mpr == 0){
     run_task($logger,
-        "Assign_FLS2DiffSamples_By_Tag",,
+        "Assign_FLS2DiffSamples_By_Tag",
         "Assign FLS data to different samples:",
         "perl $binpath/bin/extract.perfect.pl -fq1 $Ffq -fq2 $Bfq -pri $Primer -out $f_out -len $Len -mis $Mpr -qua $Bcut >>log",
         "$Ffq + $Bfq --> $f_out\_list",
@@ -937,10 +937,12 @@ sub run_task{
         $logger->info("Use existing result for step $job_iden\n");
         return 0;
     }elsif (-e $done_file) {
+        $logger->info("Removing $done_file...");
         system("rm $done_file");
     }
 
     if ($submit_sge) {
+        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will be submitted to SGE\n");
         my $shell_file = "$tmpdir/$job_iden.sh";
         open OUT, ">$shell_file" or die $!;
         # print OUT "#!/usr/bin/bash\n";
@@ -957,9 +959,7 @@ export PERL_MM_OPT='$PERL_MM_OPT'
 cd "$workdir"
 
 set -vex
-echo "$prefix_msg"
 $cmd
-echo "$post_msg"
 touch $done_file
 END_MESSAGE
 
@@ -976,10 +976,10 @@ END_MESSAGE
             sleep 10;
             last if (-e "$done_file");
         }
-
         $logger->info("Command finished:\n$submit_sge\n");
+
     }else{
-        $logger->info("$prefix_msg\n$cmd\n$post_msg\n");
+        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will run locally\n");
         system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd\n");
         system("touch $done_file") == 0 or $logger->error("Command Failed:\ntouch $done_file\n");
     }
