@@ -98,11 +98,12 @@ use FindBin qw($Bin $Script);
 use Log::Log4perl qw(get_logger :levels);
 use Log::Dispatch;
 use Parallel::ForkManager;
+use Env qw(PATH PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT);
 
 
 my $logger = get_logger("SOAPBarcode");
 
-my ($Debug, $Parallel_task, $submit_sge, $resume, $avf);
+my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
 my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
 GetOptions(
@@ -164,7 +165,7 @@ if ($Parallel_task < 0) {
     $logger->error("-ptask must be >= 0");
 }
 
-$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}'
+$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}';
 
 $Bcut=5 if (!defined $Bcut);
 $Len ||= 0;
@@ -294,7 +295,7 @@ while(<FLI>){
 
     my $dupout="$_".".dup";
     run_task($logger,
-        "FLS_Dereplication",
+        "FLS_Dereplication.$dupout",
         "Dereplication of FLS data:",
         "$binpath/bin/vsearch --derep_fulllength $_ --output $dupout --sizeout --strand both --minuniquesize 2",
         "$_ --> $dupout",
@@ -307,7 +308,7 @@ while(<FLI>){
     if ($Pro eq "y") {
         my $proout="$_".".pro";
         run_task($logger,
-            "FLS_PCG_expression_check",
+            "FLS_PCG_expression_check.$proout",
             "Protein coding gene expression check for FLS data:",
             "perl $binpath/bin/Pro_C.pl -lib f -int $Interval -fas $dupout -out $proout",
             "$dupout --> $proout",
@@ -319,7 +320,7 @@ while(<FLI>){
 
         my $otuout="$_".".otu";
         run_task($logger,
-            "FLS_CLUSTER",
+            "FLS_CLUSTER.$otuout",
             "Clustering of FLS data:",
             "$binpath/bin/vsearch --cluster_size $proout --sizein --sizeout --id $Ucf --centroids $otuout",
             "$proout --> $otuout",
@@ -358,7 +359,7 @@ while(<FLI>){
     }elsif ($Pro eq "n") {
         my $otuout="$_".".otu";
         run_task($logger,
-            "FLS_CLUSTER",
+            "FLS_CLUSTER.$otuout",
             "Skip protein coding gene expression check for FLS data...\nClustering of FLS data:",
             "$binpath/bin/vsearch --cluster_size $dupout --sizein --sizeout --id $Ucf --centroids $otuout",
             "$dupout --> $otuout",
@@ -512,7 +513,7 @@ while (<MLI>) {
     if ($Pro eq "y") {
         my $proout="$_".".pro";
         run_task($logger,
-            "SLS_PCG_expression_check",
+            "SLS_PCG_expression_check.$sortout",
             "Protein coding gene expression check for SLS data:",
             "perl $binpath/bin/Pro_C.pl -lib s -fas $_ -out $proout",
             "$_ --> $proout",
@@ -537,7 +538,7 @@ while (<MLI>) {
     my $dupout="$_".".dup";
 
     run_task($logger,
-        "FLS_Dereplication",
+        "FLS_Dereplication.$dupout",
         "Dereplication of SLS data:",
         "perl $binpath/bin/rmdupctg.pl $sortout $dupout",
         "$sortout --> $dupout",
@@ -882,34 +883,34 @@ sub run_task{
 
     my $done_file = "tmp.$job_iden.done";
     if ($resume and -e $done_file) {
+        $logger->info("Use existing result for step $job_iden\n");
         return 0;
+    }elsif (-e $done_file) {
+        system("rm $done_file");
     }
 
     if ($submit_sge) {
         my $shell_file = "tmp.$job_iden.sh";
         open OUT, ">$shell_file" or die $!;
         # print OUT "#!/usr/bin/bash\n";
-        my $message = <<'END_MESSAGE';
+        my $message = <<"END_MESSAGE";
 ############################################
 # You may need to adapt this manually!!! ###
 ############################################
-PATH="/home/gmeng/perl5/bin${PATH:+:${PATH}}"; export PATH;
-PERL5LIB="/home/gmeng/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
-PERL_LOCAL_LIB_ROOT="/home/gmeng/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
-PERL_MB_OPT="--install_base \"/home/gmeng/perl5\""; export PERL_MB_OPT;
-PERL_MM_OPT="INSTALL_BASE=/home/gmeng/perl5"; export PERL_MM_OPT;
-END_MESSAGE
-        print OUT $message;
+export PATH=$PATH
+export PERL5LIB=$PERL5LIB
+export PERL_LOCAL_LIB_ROOT=$PERL_LOCAL_LIB_ROOT
+export PERL_MB_OPT=$PERL_MB_OPT
+export PERL_MM_OPT=$PERL_MM_OPT
 
-        my $message2 = << "END_MESSAGE2";
 set -vex
 echo "$prefix_msg"
 $cmd
 echo "$post_msg"
 touch $done_file
-END_MESSAGE2
+END_MESSAGE
 
-        print OUT $message2;
+        print OUT $message;
         close OUT;
 
         $qsubt=~s/\{vf\}/$vf/g;
