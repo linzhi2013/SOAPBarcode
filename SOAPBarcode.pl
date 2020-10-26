@@ -6,8 +6,14 @@ This program is attempt to assemble standard COI barcode region with two librari
 
 =head1 Version
 
+version 4.3
+modified by Guanliang Meng: 1) use Parallel::ForkManager to deal with
+multi-samples at the same time;
+2) support running tasks on localhost and SGE cluster;
+3) support resumption of running tasks.
+
 version 4.2
-modified by Guanliang Meng: 1) use Log::Log4perl for logging.
+modified by Guanliang Meng: 1) use Log::Log4perl and Log::Dispatch for logging.
 
 version 4.1
 modified by Guanliang Meng: 1) add citation infor.
@@ -64,6 +70,13 @@ perl SOAPBarcode.pl <parameter>
 
     -ucs    the similarity cutoff of the OTU generation (0.98)
     -out    prefix of name of output file
+    -ptask  the maximum paralle tasks allowed (1)
+    -sge    submit the assembly tasks to SGE cluster to run, default local.
+    -qsubt  qsub command template, default 'qsub -cwd -l vf={vf} -pe smp {cpu}'.
+            You always have the variables '{vf}' and '{cpu}'.
+    -avf    the '{vf}' value for each assembly task ('50G')
+    -resume Resume the run.
+    -tmpdir tmp directory path (./tmp.soapbarcode)
     -help   print out this information
     -debug  Debug mode
 
@@ -86,12 +99,18 @@ use Getopt::Long;
 use FindBin qw($Bin $Script);
 use Log::Log4perl qw(get_logger :levels);
 use Log::Dispatch;
+use Parallel::ForkManager;
+use Env qw(PATH PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT);
+# use Cwd;
+use Cwd qw(getcwd abs_path);
+
+my $workdir = getcwd;
 
 my $logger = get_logger("SOAPBarcode");
 
-my $Debug;
+my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt, $tmpdir);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
-my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf,$Resume);
+my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
 GetOptions(
     "lib:s"=>\$Lib,
     "pro:s"=>\$Pro,
@@ -115,6 +134,12 @@ GetOptions(
     "ucs:i"=>\$Ucs,
     "out:s"=>\$Out,
     "debug"=>\$Debug,
+    "ptask:i"=>\$Parallel_task,
+    "sge"=>\$submit_sge,
+    "qsubt"=>\$qsubt,
+    "avf"=>\$avf,
+    "resume"=>\$resume,
+    "tmpdir:s"=>\$tmpdir,
     "help"=>\$Help
 );
 
@@ -136,6 +161,19 @@ my $appender = Log::Log4perl::Appender->new(
 # ERROR
 # FATAL
 
+
+$Parallel_task ||= 1;
+if ($Parallel_task == 1){
+    $Parallel_task = 0;
+}
+
+if ($Parallel_task < 0) {
+    $logger->error("-ptask must be >= 0");
+}
+
+$qsubt = 'qsub -cwd -l vf={vf} -pe smp {cpu}' if (!defined $qsubt);
+$avf ||= "50G";
+$tmpdir = './tmp.soapbarcode' if (!defined $tmpdir);
 
 
 $Bcut=5 if (!defined $Bcut);
@@ -162,6 +200,13 @@ if (!$Pro eq "y" and !$Pro eq "n"){
 if (!$Oop == 1 and !$Oop == 2){
     $logger->error("-oop parameter should be setted as 1 for COPE and as 2 for PEAR");
 }
+
+if (-e "$tmpdir") {
+    $logger->info("$tmpdir exists\n!")
+}else{
+    system("mkdir -p $tmpdir",)
+}
+$tmpdir = abs_path($tmpdir);
 
 open LIB, $Lib || die $!;
 my (@in_si, @lrl, @fastq, $in_sif,$in_sis,$lrlf,$lrls);
@@ -210,41 +255,105 @@ my $f_out="$Out"."_f";
 my @flist;
 my $binpath= $Bin;
 if ($Mpr == 0){
-    run_cmd($logger,
+    run_task($logger,
+        "Assign_FLS2DiffSamples_By_Tag",
         "Assign FLS data to different samples:",
         "perl $binpath/bin/extract.perfect.pl -fq1 $Ffq -fq2 $Bfq -pri $Primer -out $f_out -len $Len -mis $Mpr -qua $Bcut >>log",
-        "$Ffq + $Bfq --> $f_out\_list");
+        "$Ffq + $Bfq --> $f_out\_list",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
 }else{
-    run_cmd($logger,
+    run_task($logger,
+        "Assign_FLS2DiffSamples_By_Tag",
         "Assign FLS data to different samples:",
         "perl $binpath/bin/extract.v1.pl -fq1 $Ffq -fq2 $Bfq -pri $Primer -out $f_out -len $Len -mis $Mpr -qua $Bcut >>log",
-        "$Ffq + $Bfq --> $f_out\_list");
+        "$Ffq + $Bfq --> $f_out\_list",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
 }
 $logger->info("fq1=$Ffq\nfq2=$Bfq\nreads has been assigned\n", "FLS files for all samples are in $f_out\_list\n");
+
+my $pm_fls_denoise = Parallel::ForkManager->new($Parallel_task);
+# Setup a callback for when a child finishes up so we can
+# get it's exit code
+$pm_fls_denoise->run_on_finish( sub {
+    my ($pid, $exit_code, $ident) = @_;
+    print "** $ident just got out of the pool ".
+      "with PID $pid and exit code: $exit_code\n";
+});
+
+$pm_fls_denoise->run_on_start( sub {
+    my ($pid, $ident)=@_;
+    print "** $ident started, pid: $pid\n";
+});
+
+$pm_fls_denoise->run_on_wait( sub {
+    print "** Have to wait for one children ...\n"
+  },
+  0.5
+);
 
 open FLI, "$f_out\_list" || die $!;
 #open FEN, ">$fendlist" || die $!;
 my $full_out_pct=(100-$Ucf*100);
+
+FLS_DENOISE_LOOP:
 while(<FLI>){
     chomp;
+    # Forks and returns the pid for the child:
+    my $pid = $pm_fls_denoise->start($_) and next FLS_DENOISE_LOOP;
+
     my $dupout="$_".".dup";
-    run_cmd($logger,
+    run_task($logger,
+        "FLS_Dereplication.$dupout",
         "Dereplication of FLS data:",
         "$binpath/bin/vsearch --derep_fulllength $_ --output $dupout --sizeout --strand both --minuniquesize 2",
-        "$_ --> $dupout");
+        "$_ --> $dupout",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
 
     if ($Pro eq "y") {
         my $proout="$_".".pro";
-        run_cmd($logger,
+        run_task($logger,
+            "FLS_PCG_expression_check.$proout",
             "Protein coding gene expression check for FLS data:",
             "perl $binpath/bin/Pro_C.pl -lib f -int $Interval -fas $dupout -out $proout",
-            "$dupout --> $proout");
-
+            "$dupout --> $proout",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
         my $otuout="$_".".otu";
-        run_cmd($logger,
+        run_task($logger,
+            "FLS_CLUSTER.$otuout",
             "Clustering of FLS data:",
-            "$binpath/bin/vsearch --cluster_size $proout --sizein --sizeout --id $Ucf --centroids $otuout",
-            "$proout --> $otuout");
+            "$binpath/bin/vsearch --cluster_size $proout --threads 1 --sizein --sizeout --id $Ucf --centroids $otuout",
+            "$proout --> $otuout",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -268,16 +377,24 @@ while(<FLI>){
         close TEI;
         close TEO;
 #       print FEN "$endout\n";
-        push @flist,$endout;
+        # push @flist,$endout; # mgl: no use in paralle task
         run_cmd($logger,
             "Removing intermediate files: $dupout $proout $otuout",
             "rm $dupout $proout $otuout", "");
     }elsif ($Pro eq "n") {
         my $otuout="$_".".otu";
-        run_cmd($logger,
+        run_task($logger,
+            "FLS_CLUSTER.$otuout",
             "Skip protein coding gene expression check for FLS data...\nClustering of FLS data:",
-            "$binpath/bin/vsearch --cluster_size $dupout --sizein --sizeout --id $Ucf --centroids $otuout",
-            "$dupout --> $otuout");
+            "$binpath/bin/vsearch --cluster_size $dupout --threads 1 --sizein --sizeout --id $Ucf --centroids $otuout",
+            "$dupout --> $otuout",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
@@ -302,15 +419,23 @@ while(<FLI>){
         close TEI;
         close TEO;
 #       print FEN "$endout\n";
-        push @flist,$endout;
+        # push @flist,$endout; # mgl: no use in paralle task
         run_cmd($logger,
             "Removing intermediate files: $dupout $otuout",
             "rm $dupout $otuout", "");
     }else{
         $logger->error("-pro parameter should be y or n for protein expression check option");
     }
+
+    $pm_fls_denoise->finish;
 }
+$logger->info("FLS_DENOISE_LOOP: Waiting for Children...\n");
+$pm_fls_denoise->wait_all_children;
+$logger->info("FLS_DENOISE_LOOP: Everybody is out of the pool!\n");
+
 close FLI;
+
+@flist = glob("$f_out*.fasta.end"); # mgl: get all *.fasta.end files.
 
 ########################get full length reads set###########################
 
@@ -324,17 +449,34 @@ my $expect=2*$lrls-$in_sis;
 $cmru=($lrls-1);
 if ($expect>=60){$cmrl=int($expect/3)}else{$cmrl=20};
 if ($Oop ==1 ){
-    run_cmd($logger,
+    run_task($logger,
+        "SLS_connect_R1_R2_CMR",
         "Connect read1 and read2 for SLS data:",
         "$binpath/bin/cmr -a $Fsfq -b $Bsfq -o $Out4 -2 $Out.1.left -3 $Out.2.left -l $cmrl -u $cmru -c $Osc >overlap.log",
-        "$Fsfq + $Bsfq --> $Out4");
+        "$Fsfq + $Bsfq --> $Out4",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
 }elsif ($Oop ==2){
     my $pear_min=$lrls+1;
     my $pear_mio=$cmrl;
-    run_cmd($logger,
+    run_task($logger,
+        "SLS_connect_R1_R2_PEAR",
         "Connect read1 and read2 for SLS data:",
         "perl $binpath/bin/pear_overlap.pl -for $Fsfq -rev $Bsfq -out $Out4 -min $pear_min -mio $pear_mio -cpt $Cpt",
-        "$Fsfq + $Bsfq --> $Out4");
+        "$Fsfq + $Bsfq --> $Out4",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
+
 }else{
     $logger->error("the overlap program can be setted as 1 for COPE and as 2 for PEAR");
 }
@@ -342,32 +484,81 @@ $logger->info("$Fsfq and $Bsfq: the shotgun reads have been overlapped, result f
 
 my $s_out="$Out"."_s";
 if ($Mpr ==0){
-    run_cmd($logger,
+    run_task($logger,
+        "Assign_SLS2DiffSamples_By_Tag",
         "Assign SLS data to different samples:",
         "perl $binpath/bin/shotgun_assign.perfect.pl -pri $Primer -fas $Out4 -out $s_out -mis $Mpr -len $Len",
-        "$Out4 --> $s_out\_list");
+        "$Out4 --> $s_out\_list",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir, 
+        $tmpdir);
 }else{
-    run_cmd($logger,
+    run_task($logger,
+        "Assign_SLS2DiffSamples_By_Tag",
         "Assign SLS data to different samples:",
         "perl $binpath/bin/shotgun_assign.pl -pri $Primer -fas $Out4 -out $s_out -mis $Mpr -len $Len",
-        "$Out4 --> $s_out\_list");
+        "$Out4 --> $s_out\_list",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
 }
 $logger->info("Shotgun reads ($Out4) has been assigned\n", "SLS files for all samples are in $s_out\_list\n");
+
+
+my $pm_sls_denoise = Parallel::ForkManager->new($Parallel_task);
+# Setup a callback for when a child finishes up so we can
+# get it's exit code
+$pm_sls_denoise->run_on_finish( sub {
+    my ($pid, $exit_code, $ident) = @_;
+    print "** $ident just got out of the pool ".
+      "with PID $pid and exit code: $exit_code\n";
+});
+
+$pm_sls_denoise->run_on_start( sub {
+    my ($pid, $ident)=@_;
+    print "** $ident started, pid: $pid\n";
+});
+
+$pm_sls_denoise->run_on_wait( sub {
+    print "** Have to wait for one children ...\n"
+  },
+  0.5
+);
 
 open MLI, "$s_out\_list" || die $!;
 my @slist;
 my $s_bwa;
 #open MDU, ">$mdout" || die $!;
+SLS_DENOISE_LOOP:
 while (<MLI>) {
     chomp;
+
+    # Forks and returns the pid for the child:
+    my $pid = $pm_sls_denoise->start($_) and next SLS_DENOISE_LOOP;
+
     my $sortout="$_".".sort";
     if ($Pro eq "y") {
         my $proout="$_".".pro";
-        run_cmd($logger,
+        run_task($logger,
+            "SLS_PCG_expression_check.$sortout",
             "Protein coding gene expression check for SLS data:",
             "perl $binpath/bin/Pro_C.pl -lib s -fas $_ -out $proout",
-            "$_ --> $proout");
-
+            "$_ --> $proout",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
         run_cmd($logger,
             "Renaming $proout to $sortout",
             "mv $proout $sortout", "");
@@ -380,20 +571,38 @@ while (<MLI>) {
     }else{
         $logger->error("-pro parameter should be y or n for protein expression check option");
     }
+
     my $dupout="$_".".dup";
-    run_cmd($logger,
+    run_task($logger,
+        "FLS_Dereplication.$dupout",
         "Dereplication of SLS data:",
         "perl $binpath/bin/rmdupctg.pl $sortout $dupout",
-        "$sortout --> $dupout");
+        "$sortout --> $dupout",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        "500M",
+        1,
+        $workdir,
+        $tmpdir);
+
 #   print MDU "$dupout\n";
-    push @slist, $dupout;
+    # push @slist, $dupout; # mgl: no use in paralle task
     if ($Len==0){
         $s_bwa = $sortout
     }else{
         $logger->info("Removing $sortout");
         `rm $sortout`
     }
+
+    $pm_sls_denoise->finish;
 }
+$logger->info("SLS_DENOISE_LOOP: Waiting for Children...\n");
+$pm_sls_denoise->wait_all_children;
+$logger->info("SLS_DENOISE_LOOP: Everybody is out of the pool!\n");
+
+@slist = glob("$s_out*.fasta.dup"); # mgl: get all *.fasta.dup files.
+
 close MLI;
 $logger->info("The shotgun reads have been denoised, result files: @slist");
 
@@ -418,22 +627,55 @@ for my $i (0..$#slist){
     }
 }
 
+my $pm_assemble = Parallel::ForkManager->new($Parallel_task);
+# Setup a callback for when a child finishes up so we can
+# get it's exit code
+$pm_assemble->run_on_finish( sub {
+    my ($pid, $exit_code, $ident) = @_;
+    print "** $ident just got out of the pool ".
+      "with PID $pid and exit code: $exit_code\n";
+});
+
+$pm_assemble->run_on_start( sub {
+    my ($pid, $ident)=@_;
+    print "** $ident started, pid: $pid\n";
+});
+
+$pm_assemble->run_on_wait( sub {
+    print "** Have to wait for one children ...\n"
+  },
+  300
+);
+
+BARCODE_ASSEMBLE:
 for my $key (keys %component) {
     if (@{$component{$key}}!=2) {
         $logger->warn("index $key only generate one lib, skip this!");
         next;
     }
-    my $libout="$key\.lib";
+
+    # Forks and returns the pid for the child:
+    my $pid = $pm_assemble->start($key) and next BARCODE_ASSEMBLE;
+
+    my $libout="$tmpdir/$key\.lib";
     $logger->info("Preparing $libout for sample $key");
     open LIB, ">$libout" || die $!;
-    print LIB ">\nf=./$component{$key}[1]";
+    print LIB ">\nf=$workdir/$component{$key}[1]";
     close LIB;
     my $assout="$Out\_$key";
 
-    run_cmd($logger,
+    run_task($logger,
+        "barcode_assembly.$key",
         "Let's assemble $key:",
-        "$binpath/bin/barcode -e $component{$key}[0] -r $libout -l $Lsk -k $Lmk -o $assout -v $Kin -c $Clk -s $Clb -n $Lss -x $Lms -t $Cpt 1>$key.barcode.log 2>$key.barcode.err",
-        "Result file: $assout.contig");
+        "$binpath/bin/barcode -e $component{$key}[0] -r $libout -l $Lsk -k $Lmk -o $assout -v $Kin -c $Clk -s $Clb -n $Lss -x $Lms -t $Cpt 1>$tmpdir/$key.barcode.log 2>$tmpdir/$key.barcode.err",
+        "Result file: $assout.contig",
+        $resume,
+        $submit_sge,
+        $qsubt,
+        $avf,
+        $Cpt,
+        $workdir,
+        $tmpdir);
 
     $logger->info("Choose the first isoform for each locus:\n $assout.contig --> $assout.contig.F");
     open ASS, "$assout.contig" || die $!;
@@ -467,10 +709,20 @@ for my $key (keys %component) {
     close ASS;
     close ASF;
 #   push @assembled, "$assout.contig.F";
-    push @{$component{$key}},"$assout.contig.F"; # mgl: 2: *.contig.F files from barcode program
-    # `rm $libout`;
+    # below: mgl: no use in paralle task
+    # push @{$component{$key}},"$assout.contig.F"; # mgl: 2: *.contig.F files from barcode program
+
+    $pm_assemble->finish;
 }
 
+$logger->info("BARCODE_ASSEMBLE: Waiting for Children...\n");
+$pm_assemble->wait_all_children;
+$logger->info("BARCODE_ASSEMBLE: Everybody is out of the pool!\n");
+
+for my $key (keys %component) {
+    my $assout="$Out\_$key";
+    push @{$component{$key}},"$assout.contig.F";
+}
 
 ##########################      asembly        ##############################
 
@@ -484,40 +736,116 @@ $logger->info("Assembly finished!\nLet's obtain the abundance information!");
 $full_out_pct=(100-$Ucs*100);
 my $com_num=keys %component;
 
+my $pm_abundance = Parallel::ForkManager->new($Parallel_task);
+# Setup a callback for when a child finishes up so we can
+# get it's exit code
+$pm_abundance->run_on_finish( sub {
+    my ($pid, $exit_code, $ident) = @_;
+    print "** $ident just got out of the pool ".
+      "with PID $pid and exit code: $exit_code\n";
+});
+
+$pm_abundance->run_on_start( sub {
+    my ($pid, $ident)=@_;
+    print "** $ident started, pid: $pid\n";
+});
+
+$pm_abundance->run_on_wait( sub {
+    print "** Have to wait for one children ...\n"
+  },
+  0.5
+);
+
+GET_ABUNDANCE:
 for my $key (keys %component){
     next unless (defined $component{$key}[2]);
+
+    # Forks and returns the pid for the child:
+    my $pid = $pm_abundance->start($key) and next GET_ABUNDANCE;
+
     if ($com_num==1 && $Len==0){
         $logger->info("To obtain the abundance information by mapping SLS reads against assembled sequences");
 
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].bwa.index",
             "Indexing the assembly file: $component{$key}[2]:",
-            "$binpath/bin/bwa index $component{$key}[2]", "");
+            "$binpath/bin/bwa index $component{$key}[2]",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].bwa.aln",
             "Maping SLS data $s_bwa to $component{$key}[2]:",
-            "$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai", "");
+            "$binpath/bin/bwa aln -n 0 -t $Cpt $component{$key}[2] $s_bwa >bwa.sai",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "2G",
+            $Cpt,
+            $workdir,
+            $tmpdir);
 
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].bwa.samse",
             "Generating SAM file:",
-            "$binpath/bin/bwa samse $component{$key}[2] bwa.sai $s_bwa >bwa.sam", "");
+            "$binpath/bin/bwa samse $component{$key}[2] bwa.sai $s_bwa >bwa.sam",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "1G",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $abun_out="$component{$key}[2]"."A";
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].cal.abundance",
             "Calculate average sequencing coverage based on SAM file:",
             "perl $binpath/bin/sam_abundance.pl -fas $component{$key}[2] -sam bwa.sam -out $abun_out",
-            "$component{$key}[2] + bwa.sam --> $abun_out");
+            "$component{$key}[2] + bwa.sam --> $abun_out",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $sort_out="$abun_out"."S";
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].barcode.sortbysize",
             "Sort $abun_out by size --> $sort_out",
             "$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out",
-            "");
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].barcode.cluster",
             "Cluster $sort_out into OTUs --> $cluster_out:",
-            "$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out", "");
-
+            "$binpath/bin/vsearch --cluster_size $sort_out --threads 1 --sizein --sizeout --id $Ucs --centroids $cluster_out",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
         run_cmd($logger,
             "Removing $abun_out $sort_out",
             "rm $abun_out $sort_out", "");
@@ -553,19 +881,45 @@ for my $key (keys %component){
         close COU;
 
         my $sort_out="$abun_out"."S";
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].barcode.sortbysize",
             "Sort $abun_out by size --> $sort_out",
-            "$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out", "");
+            "$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
 
         my $cluster_out="$sort_out"."TA";
-        run_cmd($logger,
+        run_task($logger,
+            "$component{$key}[2].barcode.cluster",
             "Cluster $sort_out into OTUs --> $cluster_out:",
-            "$binpath/bin/vsearch --cluster_size $sort_out --sizein --sizeout --id $Ucs --centroids $cluster_out","");
+            "$binpath/bin/vsearch --cluster_size $sort_out --threads 1 --sizein --sizeout --id $Ucs --centroids $cluster_out",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
+
 #        `rm $abun_out $sort_out`;
     }else{
         $logger->error("there are problems of index length ($Len) and number of assembled reuslts ($com_num)");
     }
+
+    $pm_abundance->finish;
 }
+
+$logger->info("GET_ABUNDANCE: Waiting for Children...\n");
+$pm_abundance->wait_all_children;
+$logger->info("GET_ABUNDANCE: Everybody is out of the pool!\n");
+
 
 #######   abundance information retrieve and final cluster    #############
 
@@ -576,3 +930,65 @@ sub run_cmd {
     $logger->info("$prefix_msg\n$cmd\n$post_msg\n");
     system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd\n");
 }
+
+
+sub run_task{
+    my ($logger, $job_iden, $prefix_msg, $cmd, $post_msg, $resume, $submit_sge, $qsubt, $vf, $cpu, $workdir, $tmpdir) = @_;
+    my $done_file = "$tmpdir/$job_iden.done";
+    my $stderr_file = "$tmpdir/$job_iden.error";
+    my $stdout_file = "$tmpdir/$job_iden.log";
+
+    if ($resume and -e $done_file) {
+        $logger->info("Use existing result for step $job_iden\n");
+        return 0;
+    }elsif (-e $done_file) {
+        $logger->info("Removing $done_file...");
+        system("rm $done_file");
+    }
+
+    if ($submit_sge) {
+        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will be submitted to SGE\n");
+        my $shell_file = "$tmpdir/$job_iden.sh";
+        open OUT, ">$shell_file" or die $!;
+        # print OUT "#!/usr/bin/bash\n";
+        my $message = <<"END_MESSAGE";
+############################################
+# You may need to adapt this manually!!! ###
+############################################
+export PATH='$PATH'
+export PERL5LIB='$PERL5LIB'
+export PERL_LOCAL_LIB_ROOT='$PERL_LOCAL_LIB_ROOT'
+export PERL_MB_OPT='$PERL_MB_OPT'
+export PERL_MM_OPT='$PERL_MM_OPT'
+
+cd "$workdir"
+
+set -vex
+$cmd
+touch $done_file
+END_MESSAGE
+
+        print OUT $message;
+        close OUT;
+
+        $qsubt=~s/\{vf\}/$vf/g;
+        $qsubt=~s/\{cpu\}/$cpu/g;
+        my $submit_sge = "$qsubt -e $stderr_file -o $stdout_file $shell_file";
+        system("$submit_sge") == 0
+            or $logger->error("Command Failed:\n$submit_sge\n");
+
+        while (1) {
+            sleep 10;
+            last if (-e "$done_file");
+        }
+        $logger->info("Command finished:\n$submit_sge\n");
+
+    }else{
+        $logger->info("$prefix_msg\n$cmd\n$post_msg\nThis task will run locally\n");
+        system("$cmd") == 0 or $logger->error("Command Failed:\n$cmd\n");
+        system("touch $done_file") == 0 or $logger->error("Command Failed:\ntouch $done_file\n");
+    }
+
+}
+
+
