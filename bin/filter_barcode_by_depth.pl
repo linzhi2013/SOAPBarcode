@@ -65,6 +65,11 @@ print "$cmd_depth\n";
 system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
 
 
+# delete index files
+my $cmd_del_index = "rm -rf $in_fas.bwt $in_fas.pac $in_fas.ann $in_fas.amb $in_fas.sa";
+print "$cmd_del_index\n";
+system("$cmd_del_index") == 0 or die "Command Failed:\n$cmd_del_index\n";
+
 # filter sequences by depth
 open DE, "<$depth_file" or die $depth_file;
 my %hash;
