@@ -11,6 +11,7 @@ If all frames have stop codons, we remove this contig.
 
 5. remove the barcodes contig with 0X-depth
 
+6. upgrade BWA '0.5.9-r16' to '0.7.17-r1198-dirty'
 v4.2
 1. change usearch to vesearch.
 2. partially fixed a bug during read the lib file (-lib option).
