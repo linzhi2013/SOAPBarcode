@@ -14,32 +14,35 @@ use Getopt::Long;
         --frame         Frames to translate. [1,2,3]
         --code          Genetic code [5]
         --out           "prefix of the output file"
+        --seqkit        Path to 'seqkit' executable. [seqkit]
         --help          "print out this information"
 
 =cut
 
 
 
-my ($in_fas,$frame,$genetic_code,$prefix, $Help);
+my ($in_fas,$frame,$genetic_code,$prefix, $seqkit, $Help);
 
 GetOptions(
         "fas:s"=>\$in_fas,
         "frame:s"=>\$frame,
-        "code:s"=>\$genetic_code,
+        "code:i"=>\$genetic_code,
         "out:s"=>\$prefix,
+        "seqkit:s"=>\$seqkit,
         "help"=>\$Help
 );
 
 die `pod2text $0` if ($Help || !defined ($in_fas) || !defined ($prefix) );
 $frame = "1,2,3" if (!defined $frame);
 $genetic_code = 5 if (!defined $genetic_code);
+$seqkit = "seqkit" if (!defined $seqkit);
 
 my $frame_count = split /,/, $frame;
 
 # seqkit translate --allow-unknown-codon --clean --frame 1,2,3 --transl-table 5 --out-file a HeBi.cds
 
 my $protein_file = "$prefix.translated";
-my $cmd1 = "seqkit translate --allow-unknown-codon --clean --frame $frame --transl-table $genetic_code --out-file $protein_file $in_fas";
+my $cmd1 = "$seqkit translate --allow-unknown-codon --clean --frame $frame --transl-table $genetic_code --out-file $protein_file $in_fas";
 
 print "$cmd1\n";
 system("$cmd1") == 0 or die "Command Failed:\n$cmd1\n";

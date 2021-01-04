@@ -27,7 +27,7 @@ my ($in_fas,$depth_cutoff, @fqfiles, $prefix, $bwa, $samtools, $thread, $Help);
 
 GetOptions(
         "fas:s"=>\$in_fas,
-        "depth:f"=>\$depth_cutoff,
+        "depth:i"=>\$depth_cutoff,
         "fq:s"=>\@fqfiles,
         "out:s"=>\$prefix,
         "bwa:s"=>\$bwa,
@@ -48,13 +48,13 @@ $thread = 2 if (!defined $thread);
 
 my $cmd_index = "$bwa index $in_fas";
 print "$cmd_index\n";
-# system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
+system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
 
 # bwa sampe
 my $mapped_bam = "$prefix.mapped.bam";
 my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view -h -b -F 4 | $samtools sort -t $thread -o $mapped_bam ";
 print "$cmd_bwa\n";
-# system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
+system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 
 # get depth
 my $depth_file = "$prefix.depth";
@@ -62,7 +62,7 @@ my $depth_file = "$prefix.depth";
 # reference name, position, and coverage depth.
 my $cmd_depth = "$samtools depth -a -a -o $depth_file $mapped_bam";
 print "$cmd_depth\n";
-# system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
+system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
 
 
 # filter sequences by depth

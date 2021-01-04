@@ -6,6 +6,13 @@ This program is attempt to assemble standard COI barcode region with two librari
 
 =head1 Version
 
+version 4.4
+modified by Guanliang Meng: 1) upgrade BWA '0.5.9-r16' to '0.7.17-r1198-dirty';
+2) filter contigs with internal stop codons (translate 1,2,3 frames by default);
+3) filter contigs with specific sequencing depth by mapping SLS against contigs.
+
+Warning: Not work for samples without barcode sequences ahead of the primers.
+
 version 4.3
 modified by Guanliang Meng: 1) use Parallel::ForkManager to deal with
 multi-samples at the same time;
@@ -66,6 +73,12 @@ perl SOAPBarcode.pl <parameter>
     -lss    the minimun extension length (450)
     -cpt    the CPU number allowed for each assembly task (8)
 
+------------------------| filter parameter |----------------------------
+
+    -frame  Frames to translate when check on stop codons or unknown codons. [1,2,3]
+    -code   Genetic code [5]
+    -depth  Depth cutoff. Contigs with <= Depth_cutoff sites will be removed. [0]
+
 --------------------------| other parameter |---------------------------
 
     -ucs    the similarity cutoff of the OTU generation (0.98)
@@ -108,6 +121,8 @@ my $workdir = getcwd;
 
 my $logger = get_logger("SOAPBarcode");
 
+my ($genetic_code, $frame, $depth_cutoff);
+
 my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt, $tmpdir);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
 my ($Osc,$Lmk,$Lsk,$Kin,$Clk,$Clb,$Lms,$Lss,$Cpt,$Ucs,$Ucf);
@@ -140,6 +155,9 @@ GetOptions(
     "avf"=>\$avf,
     "resume"=>\$resume,
     "tmpdir:s"=>\$tmpdir,
+    "frame:s"=>\$frame,
+    "code:i"=>\$genetic_code,
+    "depth:i"=>\$depth_cutoff,
     "help"=>\$Help
 );
 
@@ -192,6 +210,11 @@ $Lss ||=450;
 $Cpt ||=8;
 $Ucs ||=0.98;
 $Ucf ||=0.98;
+
+$frame = "1,2,3" if (!defined $frame);
+$genetic_code = 5 if (!defined $genetic_code);
+$depth_cutoff = 0 if (!defined $depth_cutoff);
+
 die `pod2text $0` if ($Help || !defined $Lib || (defined $Interval && ($Pro eq "n"))|| !defined $Primer || !defined $Out);
 
 if (!$Pro eq "y" and !$Pro eq "n"){
@@ -851,9 +874,40 @@ for my $key (keys %component){
             "rm $abun_out $sort_out", "");
 
     }elsif($com_num >1 && $Len>0){
+        my $clean_cds_file = "$component{$key}[2].clean.fas"; # the result file of next command
+        # mgl: $component{$key}[2] is the *.contig.F files from barcode program
+        run_task($logger,
+            "$component{$key}[2].translation_check",
+            "To filter contigs in $component{$key}[2] by translation -> $clean_cds_file",
+            "perl $binpath/bin/barcode_translation.pl --fas $component{$key}[2] --frame $frame --code $genetic_code --out $component{$key}[2] --seqkit $binpath/bin/seqkit ",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "500M",
+            1,
+            $workdir,
+            $tmpdir);
+
+        my $depth_pass_cds_file = "$component{$key}[2].depth-lt-${depth_cutoff}X";
+        run_task($logger,
+            "$component{$key}[2].coverage_check",
+            "To filter contigs in $clean_cds_file by mapping SLS data against it. -> $depth_pass_cds_file",
+            "perl $binpath/bin/filter_barcode_by_depth.pl --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread 4",
+            "",
+            $resume,
+            $submit_sge,
+            $qsubt,
+            "4G",
+            4,
+            $workdir,
+            $tmpdir);
+
         $logger->info("To obtain the abundance information for $component{$key}[2] by extracting 'size' info from $component{$key}[0] of FLS data --> $component{$key}[2]A");
+    
         my %chash;
-        open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
+        # open CAS, "$component{$key}[2]" || die $!; # mgl: the *.contig.F files from barcode program
+        open CAS, "$depth_pass_cds_file" || die $!;
         $/="\>";<CAS>;$/="\n";
         while(<CAS>){
             chomp;
