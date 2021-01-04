@@ -60,7 +60,7 @@ system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 my $depth_file = "$prefix.depth";
 # tab-separated
 # reference name, position, and coverage depth.
-my $cmd_depth = "$samtools depth -a -a -o $depth_file $mapped_bam";
+my $cmd_depth = "$samtools depth -q 20 -Q 30 -s -a -a -o $depth_file $mapped_bam";
 print "$cmd_depth\n";
 system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
 
