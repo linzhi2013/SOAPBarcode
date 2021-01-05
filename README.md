@@ -20,12 +20,20 @@ Liu S, Li Y, Lu J, Su X, Tang M, Zhang R, Zhou L, Zhou C, Yang Q, Ji Y, Yu DW. S
 
 **version 4.4**
 
-modified by Guanliang Meng: 1) upgrade BWA '0.5.9-r16' to
-    '0.7.17-r1198-dirty'; 2) filter contigs with internal stop codons
-    (translate 1,2,3 frames by default); 3) filter contigs with specific
-    sequencing depth by mapping SLS against contigs. **Warning: The two new
-    features DO NOT work for samples without barcode sequences ahead of the
-    primers.**
+modified by Guanliang Meng:
+
+1. upgrade BWA '0.5.9-r16' to
+    '0.7.17-r1198-dirty';
+
+2. filter contigs with internal stop codons
+    (translate 1,2,3 frames by default);
+
+3. filter contigs with specific
+    sequencing depth by mapping SLS against contigs.
+
+
+**Warning: The two new features DO NOT work for samples without barcode sequences ahead of the primers.**
+
 
 **version 4.3**
 
