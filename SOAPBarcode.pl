@@ -8,6 +8,11 @@ Available at https://github.com/linzhi2013/SOAPBarcode.
 
 =head1 Version
 
+version 4.6
+modified by Guanliang Meng: 
+1) add -view_opt option so that user can decide the prefect option
+for SAM file filtering during calculate site-depth.
+
 version 4.5
 modified by Guanliang Meng: 1) Fixed a bug in finding the barcodes from filenames
 in @flist and @slist; 2) Use SAM flag -F 3852 to replace -F 4 when filter SAM files.
@@ -92,9 +97,10 @@ perl SOAPBarcode.pl <parameter>
 
 ------------------------| filter parameter |----------------------------
 
-    -frame  Frames to translate when check on stop codons or unknown codons. 0 for no check. [1,2,3]
-    -code   Genetic code [5]
-    -depth  Depth cutoff. Contigs with <= Depth_cutoff sites will be removed. [0]
+    -frame    Frames to translate when check on stop codons or unknown codons. 0 for no check. [1,2,3]
+    -code     Genetic code [5]
+    -view_opt Options for `samtools view` during SAM filtering. ["-h -b -f 0x2"]
+    -depth    Depth cutoff. Contigs with <= Depth_cutoff sites will be removed. [0]
 
 --------------------------| other parameter |---------------------------
 
@@ -138,7 +144,7 @@ my $workdir = getcwd;
 
 my $logger = get_logger("SOAPBarcode");
 
-my ($genetic_code, $frame, $depth_cutoff);
+my ($genetic_code, $frame, $depth_cutoff, $samtools_view_opt);
 
 my ($Debug, $Parallel_task, $submit_sge, $resume, $avf, $qsubt, $tmpdir);
 my ($Lib,$Ffq,$Bfq,$Fsfq,$Bsfq,$Primer,$Bcut,$Interval,$Out,$Help,$Len,$Minimum,$Mpr,$Pro,$Oop);
@@ -231,6 +237,7 @@ $Ucf ||=0.98;
 $frame = "1,2,3" if (!defined $frame);
 $genetic_code = 5 if (!defined $genetic_code);
 $depth_cutoff = 0 if (!defined $depth_cutoff);
+$samtools_view_opt = "-h -b -f 0x2" if (!defined $samtools_view_opt);
 
 die `pod2text $0` if ($Help || !defined $Lib || (defined $Interval && ($Pro eq "n"))|| !defined $Primer || !defined $Out);
 
@@ -913,7 +920,7 @@ for my $key (keys %component){
         run_task($logger,
             "$component{$key}[2].coverage_check",
             "To filter contigs in $clean_cds_file by mapping SLS data against it. -> $depth_pass_cds_file",
-            "perl $binpath/bin/filter_barcode_by_depth.pl --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
+            "perl $binpath/bin/filter_barcode_by_depth.pl --view_opt \"$samtools_view_opt\" --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
             "",
             $resume,
             $submit_sge,

@@ -16,6 +16,7 @@ use Getopt::Long;
         --out           "prefix of the output file"
         --bwa           Path to 'bwa' executable. [bwa]
         --samtools      Path to 'samtools' executable. [samtools]
+        --view_opt      options for `samtools view` during SAM filtering. ["-h -b -f 0x2"]
         --thread        Thread number. [2]
         --help          "print out this information"
 
@@ -23,7 +24,7 @@ use Getopt::Long;
 
 
 
-my ($in_fas,$depth_cutoff, @fqfiles, $prefix, $bwa, $samtools, $thread, $Help);
+my ($in_fas,$depth_cutoff, @fqfiles, $prefix, $bwa, $samtools, $samtools_view_opt, $thread, $Help);
 
 GetOptions(
         "fas:s"=>\$in_fas,
@@ -32,6 +33,7 @@ GetOptions(
         "out:s"=>\$prefix,
         "bwa:s"=>\$bwa,
         "samtools:s"=>\$samtools,
+        "view_opt:s"=>\$samtools_view_opt,
         "thread:i"=>\$thread,
         "help"=>\$Help
 );
@@ -40,6 +42,7 @@ die `pod2text $0` if ($Help || !defined ($in_fas) || !defined ($prefix) );
 $depth_cutoff = 0 if (!defined $depth_cutoff);
 $bwa = "bwa" if (!defined $bwa);
 $samtools = "samtools" if (!defined $samtools);
+$samtools_view_opt = "-h -b -f 0x2" if (!defined $samtools_view_opt);
 $thread = 2 if (!defined $thread);
 
 # my $fq_files = join(' ', @fqfiles);
@@ -52,7 +55,7 @@ system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
 
 # bwa sampe
 my $mapped_bam = "$prefix.mapped.bam";
-my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view -h -b -F 3852 | $samtools sort -t $thread -o $mapped_bam ";
+my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view $samtools_view_opt | $samtools sort -t $thread -o $mapped_bam ";
 print "$cmd_bwa\n";
 system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 
