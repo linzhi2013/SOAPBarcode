@@ -76,7 +76,7 @@ perl SOAPBarcode.pl <parameter>
 
 ------------------------| filter parameter |----------------------------
 
-    -frame  Frames to translate when check on stop codons or unknown codons. [1,2,3]
+    -frame  Frames to translate when check on stop codons or unknown codons. 0 for no check. [1,2,3]
     -code   Genetic code [5]
     -depth  Depth cutoff. Contigs with <= Depth_cutoff sites will be removed. [0]
 
@@ -877,19 +877,22 @@ for my $key (keys %component){
     }elsif($com_num >1 && $Len>0){
         my $clean_cds_file = "$component{$key}[2].clean.fas"; # the result file of next command
         # mgl: $component{$key}[2] is the *.contig.F files from barcode program
-        run_task($logger,
-            "$component{$key}[2].translation_check",
-            "To filter contigs in $component{$key}[2] by translation -> $clean_cds_file",
-            "perl $binpath/bin/barcode_translation.pl --fas $component{$key}[2] --frame $frame --code $genetic_code --out $component{$key}[2] --seqkit $binpath/bin/seqkit ",
-            "",
-            $resume,
-            $submit_sge,
-            $qsubt,
-            "500M",
-            1,
-            $workdir,
-            $tmpdir);
-
+        if ($frame == 0) {
+            $clean_cds_file = $component{$key}[2];
+        }else{
+            run_task($logger,
+                "$component{$key}[2].translation_check",
+                "To filter contigs in $component{$key}[2] by translation -> $clean_cds_file",
+                "perl $binpath/bin/barcode_translation.pl --fas $component{$key}[2] --frame $frame --code $genetic_code --out $component{$key}[2] --seqkit $binpath/bin/seqkit ",
+                "",
+                $resume,
+                $submit_sge,
+                $qsubt,
+                "500M",
+                1,
+                $workdir,
+                $tmpdir);
+        }
         my $depth_pass_cds_file = "$component{$key}[2].depth-lt-${depth_cutoff}X";
         run_task($logger,
             "$component{$key}[2].coverage_check",
