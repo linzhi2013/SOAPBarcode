@@ -31,44 +31,46 @@ modified by Guanliang Meng: 1) upgrade BWA '0.5.9-r16' to
 
 modified by Guanliang Meng: 
 
-    1) use Parallel::ForkManager to
+1. use Parallel::ForkManager to
     deal with multi-samples at the same time;
 
-    2) support running tasks on localhost and SGE cluster;
+2. support running tasks on localhost and SGE cluster;
 
-    3) support resumption of running tasks.
+3. support resumption of running tasks.
 
 **version 4.2**
 
 modified by Guanliang Meng:
 
-    1) use Log::Log4perl and
+1. use Log::Log4perl and
     Log::Dispatch for logging.
 
 **version 4.1**
 
 modified by Guanliang Meng:
 
-    1) add citation infor.
+1. add citation infor.
 
 **version 4.0**
 
 modified by Guanliang Meng:
 
-    1) change usearch to vsearch;
+1. change usearch to vsearch;
 
-    2) small bug fixed (partially) for reading a lib file (-lib option).
+2. small bug fixed (partially) for reading a lib file (-lib option).
 
 **version 3.0**
 
 modified by Shanlin Liu:
 
-    1) protein express check can be skipped without
+1. protein express check can be skipped without
     setting -int and -pro n;
 
-    2) multiple primers with index ahead can be
+2. multiple primers with index ahead can be
     proccessed batching, however, if index exists at only one end of primers
     (e.g. former), it should be tackled one by one with parameter -len
-    setted as 0; 3) PEAR was introduced as an option for shotgun reads
+    setted as 0;
+
+3. PEAR was introduced as an option for shotgun reads
     overlap
 
