@@ -920,7 +920,7 @@ for my $key (keys %component){
         run_task($logger,
             "$component{$key}[2].coverage_check",
             "To filter contigs in $clean_cds_file by mapping SLS data against it. -> $depth_pass_cds_file",
-            "perl $binpath/bin/filter_barcode_by_depth.pl --view_opt \"$samtools_view_opt\" --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
+            "perl $binpath/bin/filter_barcode_by_depth.pl --view_opt=\"$samtools_view_opt\" --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
             "",
             $resume,
             $submit_sge,
