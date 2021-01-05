@@ -52,10 +52,20 @@ system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
 
 # bwa sampe
 my $mapped_bam = "$prefix.mapped.bam";
-my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view -h -b -F 4 | $samtools sort -t $thread -o $mapped_bam ";
+my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view -h -b -F 3852 | $samtools sort -t $thread -o $mapped_bam ";
 print "$cmd_bwa\n";
 system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 
+# Flag 3852 meaning:
+# read unmapped (0x4)
+# mate unmapped (0x8)*
+# not primary alignment (0x100)
+# read fails platform/vendor quality checks (0x200)
+# read is PCR or optical duplicate (0x400)
+# supplementary alignment (0x800) # see https://yulijia.net/en/bioinformatics/2015/12/21/Linear-Chimeric-Supplementary-Primary-and-Secondary-Alignments.html#fn:5
+#
+# *Warning: Flag(s) and 0x8 cannot be set when read is not paired
+#                         
 # get depth
 my $depth_file = "$prefix.depth";
 # tab-separated

@@ -8,6 +8,22 @@ Available at https://github.com/linzhi2013/SOAPBarcode.
 
 =head1 Version
 
+version 4.5
+modified by Guanliang Meng: 1) Fixed a bug in finding the barcodes from filenames
+in @flist and @slist; 2) Use SAM flag -F 3852 to replace -F 4 when filter SAM files.
+
+Summary for SAM flag 3852:
+read unmapped (0x4);
+mate unmapped (0x8)*;
+not primary alignment (0x100);
+read fails platform/vendor quality checks (0x200);
+read is PCR or optical duplicate (0x400);
+supplementary alignment (0x800);
+
+*Warning: Flag(s) and 0x8 cannot be set when read is not paired
+
+See https://broadinstitute.github.io/picard/explain-flags.html
+
 version 4.4
 modified by Guanliang Meng: 1) upgrade BWA '0.5.9-r16' to '0.7.17-r1198-dirty';
 2) filter contigs with internal stop codons (translate 1,2,3 frames by default);
@@ -642,12 +658,12 @@ $logger->info("Removing $s_out\_list $f_out\_list");
 my %component;
 for my $i (0..$#flist){
     my @a=split /\_|\./,$flist[$i];
-    $component{$a[2]}[0]=$flist[$i]; # mgl: 0: *.end files from FLS
+    $component{$a[-3]}[0]=$flist[$i]; # mgl: 0: *.end files from FLS, e.g. Mexico_PCR-1_f_ACAAG.fasta.end
 }
 for my $i (0..$#slist){
     my @a=split /\_|\./,$slist[$i];
-    if (exists $component{$a[2]}){
-        push @{$component{$a[2]}},$slist[$i]; # mgl: 1: *.dup files from SLS
+    if (exists $component{$a[-3]}){
+        push @{$component{$a[-3]}},$slist[$i]; # mgl: 1: *.dup files from SLS, e.g. Mexico_PCR-1_s_AAACC.fasta.dup
     }
 }
 
