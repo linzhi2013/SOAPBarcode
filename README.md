@@ -18,6 +18,30 @@ Liu S, Li Y, Lu J, Su X, Tang M, Zhang R, Zhou L, Zhou C, Yang Q, Ji Y, Yu DW. S
 
 # Changelog
 
+**version 4.6**
+
+modified by Guanliang Meng:
+
+1) add -view_opt option so that
+user can decide the prefect option for SAM file filtering during
+    calculate site-depth.
+
+**version 4.5**
+
+modified by Guanliang Meng: 1) Fixed a bug in finding the
+    barcodes from filenames in @flist and @slist; 2) Use SAM flag -F 3852 to
+    replace -F 4 when filter SAM files.
+
+    Summary for SAM flag 3852: read unmapped (0x4); mate unmapped (0x8)*;
+    not primary alignment (0x100); read fails platform/vendor quality checks
+    (0x200); read is PCR or optical duplicate (0x400); supplementary
+    alignment (0x800);
+
+    *Warning: Flag(s) and 0x8 cannot be set when read is not paired
+
+    See https://broadinstitute.github.io/picard/explain-flags.html
+
+
 **version 4.4**
 
 modified by Guanliang Meng:
