@@ -653,8 +653,8 @@ $logger->info("SLS_DENOISE_LOOP: Everybody is out of the pool!\n");
 close MLI;
 $logger->info("The shotgun reads have been denoised, result files: @slist");
 
-$logger->info("Removing $s_out\_list $f_out\_list");
- `rm "$s_out\_list" "$f_out\_list"`;
+# $logger->info("Removing $s_out\_list $f_out\_list");
+# `rm "$s_out\_list" "$f_out\_list"`;
 ##########################get shotgun reads set##############################
 
 #---------------------------------------------------------------#
