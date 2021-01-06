@@ -433,9 +433,9 @@ while(<FLI>){
                 "touch $done_file", "");
             # print FEN "$endout\n";
             # push @flist,$endout; # mgl: no use in paralle task
-            run_cmd($logger,
-                "Removing intermediate files: $dupout $proout $otuout",
-                "rm $dupout $proout $otuout", "");
+            # run_cmd($logger,
+            #    "Removing intermediate files: $dupout $proout $otuout",
+            #    "rm $dupout $proout $otuout", "");
         }
 
     }elsif ($Pro eq "n") {
@@ -484,9 +484,9 @@ while(<FLI>){
                 "touch $done_file", "");
             # print FEN "$endout\n";
             # push @flist,$endout; # mgl: no use in paralle task
-            run_cmd($logger,
-                "Removing intermediate files: $dupout $otuout",
-                "rm $dupout $otuout", "");
+            # run_cmd($logger,
+            #    "Removing intermediate files: $dupout $otuout",
+            #    "rm $dupout $otuout", "");
        }
 
     }else{
