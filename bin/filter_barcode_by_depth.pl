@@ -55,13 +55,12 @@ system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
 
 # bwa sampe
 my $mapped_bam = "$prefix.mapped.bam";
-my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view $samtools_view_opt | $samtools sort -t $thread -o $mapped_bam ";
+my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view $samtools_view_opt | $samtools view -h -b -F 3840 | $samtools sort -t $thread -o $mapped_bam ";
 print "$cmd_bwa\n";
 system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 
-# Flag 3852 meaning:
-# read unmapped (0x4)
-# mate unmapped (0x8)*
+
+# Flag 3840 meaning:
 # not primary alignment (0x100)
 # read fails platform/vendor quality checks (0x200)
 # read is PCR or optical duplicate (0x400)
