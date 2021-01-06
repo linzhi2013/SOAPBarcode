@@ -405,9 +405,9 @@ while(<FLI>){
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
         
-        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.done";
+        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.$endout.done";
         if ($resume and -e $done_file) {
-            $logger->info("Use existing result for step SplitConncetedFLS2R1R2\n");
+            $logger->info("Use existing result for step SplitConncetedFLS2R1R2.$endout\n");
         }else{
             open TEI, "$otuout" || die $!;
             open TEO, ">$endout" || die $!;
@@ -455,9 +455,9 @@ while(<FLI>){
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
-        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.done";
+        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.$endout.done";
         if ($resume and -e $done_file) {
-            $logger->info("Use existing result for step SplitConncetedFLS2R1R2\n");
+            $logger->info("Use existing result for step SplitConncetedFLS2R1R2.$endout\n");
         }else{
             open TEI, "$otuout" || die $!;
             open TEO, ">$endout" || die $!;
