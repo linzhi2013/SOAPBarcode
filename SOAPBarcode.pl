@@ -404,30 +404,40 @@ while(<FLI>){
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
-        open TEI, "$otuout" || die $!;
-        open TEO, ">$endout" || die $!;
-        $/="\>";<TEI>;$/="\n";
-        while(my $ti=<TEI>){
-            chomp($ti);
-            $/="\>";
-            chomp(my $seq = <TEI>);
-            $seq=~s/\n//g;
-            my @a=split /NNN/,$seq;
-            $logger->error("the delimiter is wrong, reads can't be seperated into two part.\nRead name: $ti\nFilename: $otuout") unless (@a == 2);
-            my $endlenf=length $a[0];
-            my $endlenr=length $a[1];
-            if ($endlenf > $Lmk and $endlenr> $Lmk){
-                print TEO ">$ti\n$a[0]\n$a[1]\n";
+        
+        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.done";
+        if ($resume and -e $done_file) {
+            $logger->info("Use existing result for step SplitConncetedFLS2R1R2\n");
+        }else{
+            open TEI, "$otuout" || die $!;
+            open TEO, ">$endout" || die $!;
+            $/="\>";<TEI>;$/="\n";
+            while(my $ti=<TEI>){
+                chomp($ti);
+                $/="\>";
+                chomp(my $seq = <TEI>);
+                $seq=~s/\n//g;
+                my @a=split /NNN/,$seq;
+                $logger->error("the delimiter is wrong, reads can't be seperated into two part.\nRead name: $ti\nFilename: $otuout") unless (@a == 2);
+                my $endlenf=length $a[0];
+                my $endlenr=length $a[1];
+                if ($endlenf > $Lmk and $endlenr> $Lmk){
+                    print TEO ">$ti\n$a[0]\n$a[1]\n";
+                }
+                $/="\n";
             }
-            $/="\n";
+            close TEI;
+            close TEO;
+            run_cmd($logger,
+                "Creating $done_file",
+                "touch $done_file", "");
+            # print FEN "$endout\n";
+            # push @flist,$endout; # mgl: no use in paralle task
+            run_cmd($logger,
+                "Removing intermediate files: $dupout $proout $otuout",
+                "rm $dupout $proout $otuout", "");
         }
-        close TEI;
-        close TEO;
-#       print FEN "$endout\n";
-        # push @flist,$endout; # mgl: no use in paralle task
-        run_cmd($logger,
-            "Removing intermediate files: $dupout $proout $otuout",
-            "rm $dupout $proout $otuout", "");
+
     }elsif ($Pro eq "n") {
         my $otuout="$_".".otu";
         run_task($logger,
@@ -445,31 +455,40 @@ while(<FLI>){
 
         my $endout="$_".".end";
         $logger->info("Split the connected FLS reads to read1 and read2:\n", "$otuout --> $endout");
-        open TEI, "$otuout" || die $!;
-        open TEO, ">$endout" || die $!;
-        $/="\>";<TEI>;$/="\n";
-        while(my $ti=<TEI>){
-            chomp($ti);
-            $/="\>";
-            chomp(my $seq = <TEI>);
-            $seq=~s/\n//g;
-            my @a=split /NNN/,$seq;
-            $logger->error("the delimiter is wrong, reads can't be seperated into two part.\nRead name: $ti\nFilename: $otuout") unless (@a == 2);
+        my $done_file = "$tmpdir/SplitConncetedFLS2R1R2.done";
+        if ($resume and -e $done_file) {
+            $logger->info("Use existing result for step SplitConncetedFLS2R1R2\n");
+        }else{
+            open TEI, "$otuout" || die $!;
+            open TEO, ">$endout" || die $!;
+            $/="\>";<TEI>;$/="\n";
+            while(my $ti=<TEI>){
+                chomp($ti);
+                $/="\>";
+                chomp(my $seq = <TEI>);
+                $seq=~s/\n//g;
+                my @a=split /NNN/,$seq;
+                $logger->error("the delimiter is wrong, reads can't be seperated into two part.\nRead name: $ti\nFilename: $otuout") unless (@a == 2);
 
-            my $endlenf=length $a[0];
-            my $endlenr=length $a[1];
-            if ($endlenf > $Lmk and $endlenr> $Lmk){
-                print TEO ">$ti\n$a[0]\n$a[1]\n";
+                my $endlenf=length $a[0];
+                my $endlenr=length $a[1];
+                if ($endlenf > $Lmk and $endlenr> $Lmk){
+                    print TEO ">$ti\n$a[0]\n$a[1]\n";
+                }
+                $/="\n";
             }
-            $/="\n";
-        }
-        close TEI;
-        close TEO;
-#       print FEN "$endout\n";
-        # push @flist,$endout; # mgl: no use in paralle task
-        run_cmd($logger,
-            "Removing intermediate files: $dupout $otuout",
-            "rm $dupout $otuout", "");
+            close TEI;
+            close TEO;
+            run_cmd($logger,
+                "Creating $done_file",
+                "touch $done_file", "");
+            # print FEN "$endout\n";
+            # push @flist,$endout; # mgl: no use in paralle task
+            run_cmd($logger,
+                "Removing intermediate files: $dupout $otuout",
+                "rm $dupout $otuout", "");
+       }
+
     }else{
         $logger->error("-pro parameter should be y or n for protein expression check option");
     }
