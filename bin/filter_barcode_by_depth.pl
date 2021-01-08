@@ -18,13 +18,14 @@ use Getopt::Long;
         --samtools      Path to 'samtools' executable. [samtools]
         --view_opt      options for `samtools view` during SAM filtering. ["-h -b -f 0x2"]
         --thread        Thread number. [2]
+        --resume        Resume by using existing BAM file, 1 for resume, 0 for No. [0]
         --help          "print out this information"
 
 =cut
 
 
 
-my ($in_fas,$depth_cutoff, @fqfiles, $prefix, $bwa, $samtools, $samtools_view_opt, $thread, $Help);
+my ($in_fas,$depth_cutoff, @fqfiles, $prefix, $bwa, $samtools, $samtools_view_opt, $thread, $resume, $Help);
 
 GetOptions(
         "fas:s"=>\$in_fas,
@@ -35,6 +36,7 @@ GetOptions(
         "samtools:s"=>\$samtools,
         "view_opt:s"=>\$samtools_view_opt,
         "thread:i"=>\$thread,
+        "resume:i"=>\$resume,
         "help"=>\$Help
 );
 
@@ -44,21 +46,39 @@ $bwa = "bwa" if (!defined $bwa);
 $samtools = "samtools" if (!defined $samtools);
 $samtools_view_opt = "-h -b -f 0x2" if (!defined $samtools_view_opt);
 $thread = 2 if (!defined $thread);
+$resume = 0 if (!defined $resume);
 
 # my $fq_files = join(' ', @fqfiles);
 
-# bwa index
-
-my $cmd_index = "$bwa index $in_fas";
-print "$cmd_index\n";
-system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
-
-# bwa sampe
 my $mapped_bam = "$prefix.mapped.bam";
-my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view $samtools_view_opt | $samtools view -h -b -F 3840 | $samtools sort -t $thread -o $mapped_bam ";
-print "$cmd_bwa\n";
-system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
+my $depth_file = "$prefix.depth";
 
+unless ($resume and -e $mapped_bam) {
+    # bwa index
+    my $cmd_index = "$bwa index $in_fas";
+    print "$cmd_index\n";
+    system("$cmd_index") == 0 or die "Command Failed:\n$cmd_index\n";
+
+    # bwa sampe
+    my $cmd_bwa = "$bwa mem -t $thread $in_fas @fqfiles | $samtools view $samtools_view_opt | $samtools view -h -b -F 3840 | $samtools sort -t $thread -o $mapped_bam ";
+    print "$cmd_bwa\n";
+    system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
+
+    # get depth
+    # tab-separated
+    # reference name, position, and coverage depth.
+    my $cmd_depth = "$samtools depth -q 20 -Q 30 -s -a -a -o $depth_file $mapped_bam";
+    print "$cmd_depth\n";
+    system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
+
+    # delete index files
+    my $cmd_del_index = "rm -rf $in_fas.bwt $in_fas.pac $in_fas.ann $in_fas.amb $in_fas.sa";
+    print "$cmd_del_index\n";
+    system("$cmd_del_index") == 0 or die "Command Failed:\n$cmd_del_index\n";
+
+} else {
+    print "Use existing file: $mapped_bam!";
+}
 
 # Flag 3840 meaning:
 # not primary alignment (0x100)
@@ -68,19 +88,7 @@ system("$cmd_bwa") == 0 or die "Command Failed:\n$cmd_bwa\n";
 #
 # *Warning: Flag(s) and 0x8 cannot be set when read is not paired
 #                         
-# get depth
-my $depth_file = "$prefix.depth";
-# tab-separated
-# reference name, position, and coverage depth.
-my $cmd_depth = "$samtools depth -q 20 -Q 30 -s -a -a -o $depth_file $mapped_bam";
-print "$cmd_depth\n";
-system("$cmd_depth") == 0 or die "Command Failed:\n$cmd_depth\n";
 
-
-# delete index files
-my $cmd_del_index = "rm -rf $in_fas.bwt $in_fas.pac $in_fas.ann $in_fas.amb $in_fas.sa";
-print "$cmd_del_index\n";
-system("$cmd_del_index") == 0 or die "Command Failed:\n$cmd_del_index\n";
 
 # filter sequences by depth
 open DE, "<$depth_file" or die $depth_file;

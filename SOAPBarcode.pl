@@ -347,7 +347,7 @@ $pm_fls_denoise->run_on_start( sub {
 $pm_fls_denoise->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
-  0.5
+  10
 );
 
 open FLI, "$f_out\_list" || die $!;
@@ -495,11 +495,11 @@ while(<FLI>){
 
     $pm_fls_denoise->finish;
 }
+
+close FLI;
 $logger->info("FLS_DENOISE_LOOP: Waiting for Children...\n");
 $pm_fls_denoise->wait_all_children;
 $logger->info("FLS_DENOISE_LOOP: Everybody is out of the pool!\n");
-
-close FLI;
 
 @flist = glob("$f_out*.fasta.end"); # mgl: get all *.fasta.end files.
 
@@ -596,7 +596,7 @@ $pm_sls_denoise->run_on_start( sub {
 $pm_sls_denoise->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
-  0.5
+  10
 );
 
 open MLI, "$s_out\_list" || die $!;
@@ -663,13 +663,15 @@ while (<MLI>) {
 
     $pm_sls_denoise->finish;
 }
+close MLI;
+
 $logger->info("SLS_DENOISE_LOOP: Waiting for Children...\n");
 $pm_sls_denoise->wait_all_children;
 $logger->info("SLS_DENOISE_LOOP: Everybody is out of the pool!\n");
 
 @slist = glob("$s_out*.fasta.dup"); # mgl: get all *.fasta.dup files.
 
-close MLI;
+
 $logger->info("The shotgun reads have been denoised, result files: @slist");
 
 # $logger->info("Removing $s_out\_list $f_out\_list");
@@ -710,7 +712,7 @@ $pm_assemble->run_on_start( sub {
 $pm_assemble->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
-  300
+  10
 );
 
 BARCODE_ASSEMBLE:
@@ -819,7 +821,7 @@ $pm_abundance->run_on_start( sub {
 $pm_abundance->run_on_wait( sub {
     print "** Have to wait for one children ...\n"
   },
-  0.5
+  10
 );
 
 GET_ABUNDANCE:
@@ -917,9 +919,10 @@ for my $key (keys %component){
             "rm $abun_out $sort_out", "");
 
     }elsif($com_num >1 && $Len>0){
+
         my $clean_cds_file = "$component{$key}[2].clean.fas"; # the result file of next command
         # mgl: $component{$key}[2] is the *.contig.F files from barcode program
-        if ($frame == 0) {
+        if ($frame =~ 0) {
             $clean_cds_file = $component{$key}[2];
         }else{
             run_task($logger,
@@ -936,10 +939,14 @@ for my $key (keys %component){
                 $tmpdir);
         }
         my $depth_pass_cds_file = "$component{$key}[2].depth-lt-${depth_cutoff}X";
+        my $use_existing_bam_file = 0;
+        if ($resume) {
+            $use_existing_bam_file = 1;
+        }
         run_task($logger,
-            "$component{$key}[2].coverage_check",
+            "$component{$key}[2].coverage_check.lt-${depth_cutoff}X",
             "To filter contigs in $clean_cds_file by mapping SLS data against it. -> $depth_pass_cds_file",
-            "perl $binpath/bin/filter_barcode_by_depth.pl --view_opt=\"$samtools_view_opt\" --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
+            "perl $binpath/bin/filter_barcode_by_depth.pl --resume $use_existing_bam_file --view_opt=\"$samtools_view_opt\" --fas $clean_cds_file --depth $depth_cutoff --fq $Fsfq --fq $Bsfq --out $component{$key}[2] --bwa $binpath/bin/bwa --samtools $binpath/bin/samtools --thread $Cpt ",
             "",
             $resume,
             $submit_sge,
@@ -973,16 +980,21 @@ for my $key (keys %component){
             $cnum++;
         }
         close CFL;
-        my $abun_out="$component{$key}[2]"."A";
+
+        my $out_prefix = $component{$key}[2];
+        $out_prefix =~ s/\.F$//;
+        # my $abun_out="$component{$key}[2]"."A".".Cov${depth_cutoff}X";
+        my $abun_out = "${out_prefix}.Cov${depth_cutoff}X.F"."A";
         open COU, ">$abun_out" || die $!;
         for my $ckey(keys %chash) {
             print COU "$chash{$ckey}[1]\n$chash{$ckey}[0]";
         }
         close COU;
 
-        my $sort_out="$abun_out"."S";
+        # my $sort_out="$abun_out"."S".".Cov${depth_cutoff}X";
+        my $sort_out = "${out_prefix}.Cov${depth_cutoff}X.F"."AS";
         run_task($logger,
-            "$component{$key}[2].barcode.sortbysize",
+            "$component{$key}[2].cov${depth_cutoff}X.barcode.sortbysize",
             "Sort $abun_out by size --> $sort_out",
             "$binpath/bin/vsearch --sortbysize $abun_out --output $sort_out",
             "",
@@ -994,9 +1006,10 @@ for my $key (keys %component){
             $workdir,
             $tmpdir);
 
-        my $cluster_out="$sort_out"."TA";
+        # my $cluster_out="$sort_out"."TA".".Cov${depth_cutoff}X".".Iden${Ucs}";
+        my $cluster_out = "${out_prefix}.Cov${depth_cutoff}X.Iden${Ucs}.F"."ASTA";
         run_task($logger,
-            "$component{$key}[2].barcode.cluster",
+            "$component{$key}[2].cov${depth_cutoff}X.barcode.iden${Ucs}",
             "Cluster $sort_out into OTUs --> $cluster_out:",
             "$binpath/bin/vsearch --cluster_size $sort_out --threads 1 --sizein --sizeout --id $Ucs --centroids $cluster_out",
             "",
