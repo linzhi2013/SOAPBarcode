@@ -18,6 +18,14 @@ Liu S, Li Y, Lu J, Su X, Tang M, Zhang R, Zhou L, Zhou C, Yang Q, Ji Y, Yu DW. S
 
 # Changelog
 
+**version 4.6.7**
+
+modified by Guanliang Meng:
+
+1) shorten the waiting interval time; 
+2) support multiple coverage and cluster thresholds by resuming running.
+
+
 **version 4.6**
 
 modified by Guanliang Meng:
