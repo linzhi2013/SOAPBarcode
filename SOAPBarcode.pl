@@ -8,6 +8,11 @@ Available at https://github.com/linzhi2013/SOAPBarcode.
 
 =head1 Version
 
+version 4.7
+modified by Guanliang Meng: 
+1) shorten the waiting interval time; 
+2) support multiple coverage and cluster thresholds by resuming running.
+
 version 4.6
 modified by Guanliang Meng: 
 1) add -view_opt option so that user can decide the prefect option
