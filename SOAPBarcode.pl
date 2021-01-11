@@ -8,7 +8,7 @@ Available at https://github.com/linzhi2013/SOAPBarcode.
 
 =head1 Version
 
-version 4.6.8:
+version 4.6.8/4.6.9:
 modified by Guanliang Meng:
 1) Fixed critical bugs on user-provided float assignment (wrongly used 'i' type instead of 'f' type in the GetOptions function).
 
@@ -167,18 +167,18 @@ GetOptions(
     "abc:i"=>\$Minimum,
     "int:s"=>\$Interval,
     "mpr:i"=>\$Mpr,
-    "osc:i"=>\$Osc,
+    "osc:f"=>\$Osc,
     "oop:i"=>\$Oop,
     "lmk:i"=>\$Lmk,
     "lsk:i"=>\$Lsk,
     "kin:i"=>\$Kin,
-    "clk:i"=>\$Clk,
-    "clb:i"=>\$Clb,
+    "clk:f"=>\$Clk,
+    "clb:f"=>\$Clb,
     "lms:i"=>\$Lms,
     "lss:i"=>\$Lss,
     "cpt:i"=>\$Cpt,
-    "ucf:i"=>\$Ucf,
-    "ucs:i"=>\$Ucs,
+    "ucf:f"=>\$Ucf,
+    "ucs:f"=>\$Ucs,
     "out:s"=>\$Out,
     "debug"=>\$Debug,
     "ptask:i"=>\$Parallel_task,
