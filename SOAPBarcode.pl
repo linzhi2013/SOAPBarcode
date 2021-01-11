@@ -8,6 +8,10 @@ Available at https://github.com/linzhi2013/SOAPBarcode.
 
 =head1 Version
 
+version 4.6.8:
+modified by Guanliang Meng:
+1) Fixed critical bugs on user-provided float assignment (wrongly used 'i' type instead of 'f' type in the GetOptions function).
+
 version 4.6.7
 modified by Guanliang Meng: 
 1) shorten the waiting interval time; 
