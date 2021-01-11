@@ -18,6 +18,13 @@ Liu S, Li Y, Lu J, Su X, Tang M, Zhang R, Zhou L, Zhou C, Yang Q, Ji Y, Yu DW. S
 
 # Changelog
 
+**version 4.6.8**
+
+modified by Guanliang Meng:
+
+1) Fixed critical bugs on user-provided float assignment (wrongly used 'i' type instead of 'f' type in the GetOptions function).
+
+
 **version 4.6.7**
 
 modified by Guanliang Meng:
